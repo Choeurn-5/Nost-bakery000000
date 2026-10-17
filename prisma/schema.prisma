@@ -1,0 +1,401 @@
+// ============================================
+// NOST Bakery & Pastry — Prisma Schema
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Authentication & Users ──
+
+model User {
+  id             String    @id @default(cuid())
+  name           String
+  email          String    @unique
+  hashedPassword String
+  role           Role      @default(EDITOR)
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  activityLogs   ActivityLog[]
+}
+
+enum Role {
+  OWNER
+  EDITOR
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+}
+
+// ── Site Settings ──
+
+model SiteSettings {
+  id                  String  @id @default("default")
+  logoLight           String?
+  logoDark            String?
+  phoneNumbers        String[] @default(["060 731 888", "099 200 076"])
+  email               String  @default("info@nostbakery.com")
+  telegramLink        String  @default("https://t.me/NostBakery")
+  facebookLink        String  @default("https://www.facebook.com/NOSTBakeryPastry")
+  websiteUrl          String  @default("nostbakery.com")
+  addressEn           String  @default("Siem Reap, Cambodia")
+  addressKm           String  @default("សៀមរាប, កម្ពុជា")
+  seoTitleEn          String  @default("NOST Bakery & Pastry — Fresh Bakery in Siem Reap")
+  seoTitleKm          String  @default("NOST Bakery & Pastry — នំប៉័ង និង នំផេស្ត្រី ស្រស់ៗ នៅសៀមរាប")
+  seoDescriptionEn    String  @default("Fresh bread, pastries, cakes and desserts in Siem Reap, Cambodia. Café, takeaway and wholesale frozen bakery supply.")
+  seoDescriptionKm    String  @default("")
+  ogImage             String?
+  googleAnalyticsId   String?
+  facebookPixelId     String?
+  cookieNoticeTextEn  String  @default("We use cookies to improve your experience. By continuing, you agree to our use of cookies.")
+  cookieNoticeTextKm  String  @default("")
+  footerTextEn        String  @default("Baked with love in Siem Reap.")
+  footerTextKm        String  @default("")
+  updatedAt           DateTime @updatedAt
+}
+
+// ── Announcement Bar ──
+
+model AnnouncementBar {
+  id          String    @id @default("default")
+  textEn      String    @default("Buy 1 Get 1 Free · Every day 6:00 PM – 9:00 PM")
+  textKm      String    @default("")
+  link        String?
+  isActive    Boolean   @default(true)
+  startDate   DateTime?
+  endDate     DateTime?
+  updatedAt   DateTime  @updatedAt
+}
+
+// ── Home Page Sections ──
+
+model HomeSection {
+  id              String   @id @default(cuid())
+  sectionKey      String   @unique // hero, offers, categories, favourites, promise, business, cafe, reach, social, cta
+  headlineEn      String   @default("")
+  headlineKm      String   @default("")
+  subHeadlineEn   String   @default("")
+  subHeadlineKm   String   @default("")
+  bodyEn          String   @default("")
+  bodyKm          String   @default("")
+  buttonLabelEn   String   @default("")
+  buttonLabelKm   String   @default("")
+  buttonLink      String   @default("")
+  button2LabelEn  String   @default("")
+  button2LabelKm  String   @default("")
+  button2Link     String   @default("")
+  image           String?
+  videoUrl        String?
+  isVisible       Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  extraData       Json?    // for trust points, process steps, etc.
+  updatedAt       DateTime @updatedAt
+}
+
+// ── Categories ──
+
+model Category {
+  id          String    @id @default(cuid())
+  nameEn      String
+  nameKm      String    @default("")
+  slug        String    @unique
+  image       String?
+  imageAltEn  String    @default("")
+  imageAltKm  String    @default("")
+  isVisible   Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ── Products ──
+
+model Product {
+  id              String          @id @default(cuid())
+  nameEn          String
+  nameKm          String          @default("")
+  slug            String          @unique
+  descriptionEn   String          @default("")
+  descriptionKm   String          @default("")
+  price           Float?
+  categoryId      String
+  category        Category        @relation(fields: [categoryId], references: [id])
+  images          ProductImage[]
+  badges          ProductBadge[]  @default([])
+  availability    Availability    @default(AVAILABLE)
+  channelTags     ChannelTag[]    @default([])
+  isFeatured      Boolean         @default(false)
+  sortOrder       Int             @default(0)
+  status          ContentStatus   @default(DRAFT)
+  publishedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  promotions      PromotionProduct[]
+}
+
+model ProductImage {
+  id         String  @id @default(cuid())
+  url        String
+  altEn      String  @default("")
+  altKm      String  @default("")
+  sortOrder  Int     @default(0)
+  productId  String
+  product    Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+enum ProductBadge {
+  NEW
+  BEST_SELLER
+  SEASONAL
+  FEATURED
+}
+
+enum Availability {
+  AVAILABLE
+  SOLD_OUT
+  HIDDEN
+}
+
+enum ChannelTag {
+  RETAIL
+  WHOLESALE
+  FROZEN
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  SCHEDULED
+  TRASHED
+}
+
+// ── Promotions ──
+
+model Promotion {
+  id              String             @id @default(cuid())
+  titleEn         String
+  titleKm         String             @default("")
+  badgeTextEn     String             @default("")
+  badgeTextKm     String             @default("")
+  descriptionEn   String             @default("")
+  descriptionKm   String             @default("")
+  image           String?
+  imageAltEn      String             @default("")
+  imageAltKm      String             @default("")
+  startDate       DateTime?
+  endDate         DateTime?
+  dailyStartTime  String?            // e.g. "18:00"
+  dailyEndTime    String?            // e.g. "21:00"
+  finePrintEn     String             @default("")
+  finePrintKm     String             @default("")
+  showOnHome      Boolean            @default(false)
+  status          ContentStatus      @default(DRAFT)
+  products        PromotionProduct[]
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+}
+
+model PromotionProduct {
+  id          String    @id @default(cuid())
+  promotionId String
+  promotion   Promotion @relation(fields: [promotionId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([promotionId, productId])
+}
+
+// ── Wholesale ──
+
+model WholesaleSettings {
+  id                  String  @id @default("default")
+  heroHeadlineEn      String  @default("Bakery Supplies for Your Business")
+  heroHeadlineKm      String  @default("")
+  heroSubHeadlineEn   String  @default("Consistent quality frozen and ready-to-bake products for hotels, cafés and restaurants.")
+  heroSubHeadlineKm   String  @default("")
+  heroImage           String?
+  deliveryCoverageEn  String  @default("")
+  deliveryCoverageKm  String  @default("")
+  minimumOrderTextEn  String  @default("")
+  minimumOrderTextKm  String  @default("")
+  updatedAt           DateTime @updatedAt
+}
+
+model WholesaleStep {
+  id          String @id @default(cuid())
+  titleEn     String
+  titleKm     String @default("")
+  descriptionEn String @default("")
+  descriptionKm String @default("")
+  icon        String @default("package")
+  sortOrder   Int    @default(0)
+}
+
+model FaqItem {
+  id          String @id @default(cuid())
+  questionEn  String
+  questionKm  String @default("")
+  answerEn    String
+  answerKm    String @default("")
+  section     String @default("wholesale") // wholesale, general
+  sortOrder   Int    @default(0)
+  isVisible   Boolean @default(true)
+}
+
+// ── Locations ──
+
+model Location {
+  id              String   @id @default(cuid())
+  nameEn          String
+  nameKm          String   @default("")
+  addressEn       String
+  addressKm       String   @default("")
+  hoursEn         String   @default("")
+  hoursKm         String   @default("")
+  image           String?
+  imageAltEn      String   @default("")
+  imageAltKm      String   @default("")
+  mapEmbedUrl     String?
+  directionsLink  String?
+  services        String[] @default(["Dine-in", "Takeaway"])
+  sortOrder       Int      @default(0)
+  isVisible       Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ── Our Bakery Story Blocks ──
+
+model StoryBlock {
+  id          String @id @default(cuid())
+  headingEn   String
+  headingKm   String @default("")
+  textEn      String @default("")
+  textKm      String @default("")
+  image       String?
+  imageAltEn  String @default("")
+  imageAltKm  String @default("")
+  layout      StoryLayout @default(IMAGE_LEFT)
+  sortOrder   Int    @default(0)
+  isVisible   Boolean @default(true)
+}
+
+enum StoryLayout {
+  IMAGE_LEFT
+  IMAGE_RIGHT
+  FULL_WIDTH
+}
+
+// ── Gallery ──
+
+model GalleryItem {
+  id          String      @id @default(cuid())
+  type        GalleryType @default(IMAGE)
+  url         String
+  captionEn   String      @default("")
+  captionKm   String      @default("")
+  altEn       String      @default("")
+  altKm       String      @default("")
+  showOnHome  Boolean     @default(false)
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+}
+
+enum GalleryType {
+  IMAGE
+  VIDEO
+}
+
+// ── Testimonials ──
+
+model Testimonial {
+  id          String  @id @default(cuid())
+  name        String
+  textEn      String
+  textKm      String  @default("")
+  rating      Int     @default(5) // 1-5
+  photo       String?
+  isVisible   Boolean @default(false) // hidden by default
+  sortOrder   Int     @default(0)
+  createdAt   DateTime @default(now())
+}
+
+// ── Contact Form Submissions ──
+
+model FormSubmission {
+  id          String           @id @default(cuid())
+  name        String
+  phone       String
+  email       String?
+  type        SubmissionType
+  message     String           @default("")
+  status      SubmissionStatus @default(NEW)
+  notes       String           @default("")
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+enum SubmissionType {
+  RETAIL
+  CAKE_ORDER
+  WHOLESALE
+}
+
+enum SubmissionStatus {
+  NEW
+  CONTACTED
+  DONE
+}
+
+// ── Pages SEO ──
+
+model PageSeo {
+  id                String @id @default(cuid())
+  pageSlug          String @unique // home, menu, wholesale, cafe, bakery, promotions, contact
+  titleEn           String @default("")
+  titleKm           String @default("")
+  descriptionEn     String @default("")
+  descriptionKm     String @default("")
+  ogImage           String?
+}
+
+// ── Media Library ──
+
+model MediaFile {
+  id          String   @id @default(cuid())
+  url         String
+  publicId    String?  // Cloudinary public ID
+  filename    String
+  altEn       String   @default("")
+  altKm       String   @default("")
+  mimeType    String   @default("image/jpeg")
+  width       Int?
+  height      Int?
+  size        Int?     // bytes
+  createdAt   DateTime @default(now())
+}
+
+// ── Activity Log ──
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  action      String   // e.g. "created product", "updated settings"
+  entity      String   // e.g. "Product", "SiteSettings"
+  entityId    String?
+  details     String?
+  createdAt   DateTime @default(now())
+}
