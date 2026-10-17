@@ -27,7 +27,7 @@ const promotionSchema = z.object({
   productIds: z.array(z.string()).default([]),
 });
 
-export async function createPromotion(input: z.infer<typeof promotionSchema>) {
+export async function createPromotion(input: z.input<typeof promotionSchema>) {
   try {
     const user = await getAuthenticatedUser();
     const validated = promotionSchema.parse(input);
@@ -79,7 +79,7 @@ export async function createPromotion(input: z.infer<typeof promotionSchema>) {
   }
 }
 
-export async function updatePromotion(id: string, input: z.infer<typeof promotionSchema>) {
+export async function updatePromotion(id: string, input: z.input<typeof promotionSchema>) {
   try {
     const user = await getAuthenticatedUser();
     const validated = promotionSchema.parse(input);

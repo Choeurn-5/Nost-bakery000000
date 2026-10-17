@@ -18,7 +18,7 @@ const categorySchema = z.object({
   sortOrder: z.number().int().default(0),
 });
 
-export async function createCategory(input: z.infer<typeof categorySchema>) {
+export async function createCategory(input: z.input<typeof categorySchema>) {
   try {
     const user = await getAuthenticatedUser();
     const validated = categorySchema.parse(input);
@@ -64,7 +64,7 @@ export async function createCategory(input: z.infer<typeof categorySchema>) {
   }
 }
 
-export async function updateCategory(id: string, input: z.infer<typeof categorySchema>) {
+export async function updateCategory(id: string, input: z.input<typeof categorySchema>) {
   try {
     const user = await getAuthenticatedUser();
     const validated = categorySchema.parse(input);
