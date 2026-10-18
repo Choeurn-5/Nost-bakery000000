@@ -2,7 +2,7 @@ import * as React from "react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { getTranslations } from "next-intl/server";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { localized, getPromotionStatus, placeholderImage } from "@/lib/utils";
 import { getPageMetadata } from "@/lib/seo";
 import { Badge } from "@/components/ui/badge";
@@ -58,13 +58,12 @@ export default async function PromotionsPage({ params }: PromotionsPageProps) {
   let promotionsRaw: any[] = [];
   let settings: any = null;
   try {
-    promotionsRaw = await prisma.promotion.findMany({
-      where: { status: "PUBLISHED" },
-      orderBy: [{ startDate: "desc" }, { createdAt: "desc" }],
-    });
-    settings = await prisma.siteSettings.findUnique({
-      where: { id: "default" },
-    });
+    const [promoData, settingsData] = await Promise.all([
+      api.getPromotions(),
+      api.getSettings(),
+    ]);
+    promotionsRaw = promoData ?? [];
+    settings = settingsData?.settings ?? null;
   } catch {
     promotionsRaw = [];
     settings = null;

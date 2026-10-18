@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { localized } from "@/lib/utils";
 
 interface PageSeoDefaults {
@@ -13,13 +13,12 @@ export async function getPageMetadata(
   fallback: PageSeoDefaults
 ): Promise<Metadata> {
   try {
-    const seoRecord = await prisma.pageSeo.findUnique({
-      where: { pageSlug },
-    });
+    const [seoRecord, settingsData] = await Promise.all([
+      api.getPageSeo(pageSlug),
+      api.getSettings(),
+    ]);
 
-    const siteSettings = await prisma.siteSettings.findUnique({
-      where: { id: "default" },
-    });
+    const siteSettings = settingsData?.settings ?? null;
 
     const defaultSiteTitle =
       locale === "km"

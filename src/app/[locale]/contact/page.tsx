@@ -1,7 +1,7 @@
 import * as React from "react";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { localized } from "@/lib/utils";
 import { getPageMetadata } from "@/lib/seo";
 import { ContactForm } from "@/components/contact/contact-form";
@@ -40,13 +40,12 @@ export default async function ContactPage({ params }: ContactPageProps) {
   let settings: any = null;
   let location: any = null;
   try {
-    settings = await prisma.siteSettings.findUnique({
-      where: { id: "default" },
-    });
-    location = await prisma.location.findFirst({
-      where: { isVisible: true },
-      orderBy: { sortOrder: "asc" },
-    });
+    const [settingsData, locations] = await Promise.all([
+      api.getSettings(),
+      api.getLocations(),
+    ]);
+    settings = settingsData?.settings ?? null;
+    location = locations?.[0] ?? null;
   } catch {
     settings = null;
     location = null;

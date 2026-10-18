@@ -2,7 +2,7 @@ import * as React from "react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { getTranslations } from "next-intl/server";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { localized, formatPrice, placeholderImage } from "@/lib/utils";
 import { getPageMetadata } from "@/lib/seo";
 import { WholesaleEnquiryForm } from "@/components/wholesale/enquiry-form";
@@ -53,35 +53,14 @@ export default async function WholesalePage({ params }: WholesalePageProps) {
   let faqsRaw: any[] = [];
 
   try {
-    settings = await prisma.wholesaleSettings.findUnique({
-      where: { id: "default" },
-    });
-    productsRaw = await prisma.product.findMany({
-      where: {
-        status: "PUBLISHED",
-        availability: { not: "HIDDEN" },
-        channelTags: {
-          hasSome: ["FROZEN", "WHOLESALE"],
-        },
-      },
-      orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }],
-      include: {
-        images: {
-          orderBy: { sortOrder: "asc" },
-          take: 1,
-        },
-      },
-    });
-    stepsRaw = await prisma.wholesaleStep.findMany({
-      orderBy: { sortOrder: "asc" },
-    });
-    faqsRaw = await prisma.faqItem.findMany({
-      where: {
-        section: "wholesale",
-        isVisible: true,
-      },
-      orderBy: { sortOrder: "asc" },
-    });
+    const [wholesaleData, products] = await Promise.all([
+      api.getWholesale(),
+      api.getProducts({ channel: "WHOLESALE" }),
+    ]);
+    settings = wholesaleData?.settings ?? null;
+    stepsRaw = wholesaleData?.steps ?? [];
+    faqsRaw = wholesaleData?.faqs ?? [];
+    productsRaw = products ?? [];
   } catch {
     settings = null;
     productsRaw = [];

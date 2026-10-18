@@ -1,7 +1,7 @@
 import * as React from "react";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { localized } from "@/lib/utils";
 import { getPageMetadata } from "@/lib/seo";
 import { CategoryTabs, CategoryItem } from "@/components/menu/category-tabs";
@@ -41,75 +41,50 @@ export default async function MenuPage({
   let activeCategoryName = t("allCategories");
 
   try {
-    // 1. Fetch visible categories with product count
-    const categoriesRaw = await prisma.category.findMany({
-      where: { isVisible: true },
-      orderBy: { sortOrder: "asc" },
-      include: {
-        _count: {
-          select: {
-            products: {
-              where: {
-                status: "PUBLISHED",
-                availability: { not: "HIDDEN" },
-              },
-            },
-          },
-        },
-      },
-    });
+    // 1. Fetch categories and products from the API
+    const [categoriesData, productsData, settingsData] = await Promise.all([
+      api.getCategories(),
+      api.getProducts(activeCategorySlug ? { category: activeCategorySlug } : undefined),
+      api.getSettings(),
+    ]);
 
-    categories = categoriesRaw.map((cat: (typeof categoriesRaw)[number]) => ({
-      id: cat.id,
-      name: localized(cat as unknown as Record<string, unknown>, "name", locale) || cat.nameEn,
-      slug: cat.slug,
-      count: cat._count.products,
-    }));
-
-    // 2. Determine active category filter
-    const activeCategory = categoriesRaw.find(
-      (c: (typeof categoriesRaw)[number]) => c.slug === activeCategorySlug
-    );
-
-    // 3. Fetch products
-    const productsRaw = await prisma.product.findMany({
-      where: {
-        status: "PUBLISHED",
-        availability: { not: "HIDDEN" },
-        ...(activeCategory ? { categoryId: activeCategory.id } : {}),
-      },
-      orderBy: [{ isFeatured: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
-      include: {
-        images: {
-          orderBy: { sortOrder: "asc" },
-          take: 1,
-        },
-      },
-    });
-
-    // 4. Fetch site settings for Telegram username
-    const settings = await prisma.siteSettings.findUnique({
-      where: { id: "default" },
-    });
-    if (settings?.telegramLink) {
-      telegramUsername = settings.telegramLink;
+    if (categoriesData) {
+      categories = categoriesData.map((cat) => ({
+        id: cat.id,
+        name: localized(cat as unknown as Record<string, unknown>, "name", locale) || cat.nameEn,
+        slug: cat.slug,
+        count: cat.productsCount ?? 0,
+      }));
     }
 
-    products = productsRaw.map((p: (typeof productsRaw)[number]) => ({
-      id: p.id,
-      name: localized(p as unknown as Record<string, unknown>, "name", locale) || p.nameEn,
-      description: localized(p as unknown as Record<string, unknown>, "description", locale) || p.descriptionEn,
-      price: p.price,
-      image: p.images[0]?.url || null,
-      badges: p.badges,
-      availability: p.availability as "AVAILABLE" | "SOLD_OUT" | "HIDDEN",
-    }));
+    // 2. Find active category name
+    const activeCategory = categoriesData?.find(
+      (c) => c.slug === activeCategorySlug
+    );
+
+    // 3. Map products
+    if (productsData) {
+      products = productsData.map((p) => ({
+        id: p.id,
+        name: localized(p as unknown as Record<string, unknown>, "name", locale) || p.nameEn,
+        description: localized(p as unknown as Record<string, unknown>, "description", locale) || p.descriptionEn,
+        price: p.price,
+        image: p.images?.[0]?.url || null,
+        badges: p.badges,
+        availability: p.availability as "AVAILABLE" | "SOLD_OUT" | "HIDDEN",
+      }));
+    }
+
+    // 4. Fetch site settings for Telegram username
+    if (settingsData?.settings?.telegramLink) {
+      telegramUsername = settingsData.settings.telegramLink;
+    }
 
     activeCategoryName = activeCategory
       ? localized(activeCategory as unknown as Record<string, unknown>, "name", locale) || activeCategory.nameEn
       : t("allCategories");
   } catch {
-    // Fallback data with vibrant Unsplash bakery photos when DB is not ready
+    // Fallback data with vibrant Unsplash bakery photos when API is not ready
     categories = [
       { id: "c1", name: locale === "km" ? "វីយែនណ័រហ្សឺរី" : "Viennoiserie", slug: "croissants-viennoiserie", count: 4 },
       { id: "c2", name: locale === "km" ? "នំប៉័ងដុត" : "Artisan Breads", slug: "sourdough-breads", count: 3 },

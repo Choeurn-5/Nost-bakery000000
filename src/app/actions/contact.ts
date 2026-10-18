@@ -1,6 +1,6 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { contactSchema, type ContactFormData } from "@/lib/schemas/contact";
 
 export { contactSchema, type ContactFormData };
@@ -32,15 +32,20 @@ export async function submitContactForm(
       };
     }
 
-    await prisma.formSubmission.create({
-      data: {
-        name,
-        phone,
-        email: email && email.length > 0 ? email : null,
-        type,
-        message: message || "",
-      },
+    const res = await api.submitContact({
+      name,
+      phone,
+      email: email && email.length > 0 ? email : null,
+      type,
+      message: message || "General inquiry",
     });
+
+    if (!res.success) {
+      return {
+        success: false,
+        error: res.message || "Failed to submit enquiry.",
+      };
+    }
 
     return {
       success: true,

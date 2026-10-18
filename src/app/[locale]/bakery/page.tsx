@@ -1,7 +1,7 @@
 import * as React from "react";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { localized } from "@/lib/utils";
 import { getPageMetadata } from "@/lib/seo";
 import { StorySection, StoryBlockData } from "@/components/bakery/story-section";
@@ -31,10 +31,8 @@ export default async function BakeryPage({ params }: BakeryPageProps) {
   // 1. Fetch story blocks ordered by sortOrder with defensive offline try/catch
   let blocksRaw: any[] = [];
   try {
-    blocksRaw = await prisma.storyBlock.findMany({
-      where: { isVisible: true },
-      orderBy: { sortOrder: "asc" },
-    });
+    const blocks = await api.getStoryBlocks();
+    blocksRaw = blocks ?? [];
   } catch {
     blocksRaw = [];
   }

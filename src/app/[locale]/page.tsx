@@ -2,7 +2,7 @@ import React from "react";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { setRequestLocale } from "next-intl/server";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { localized } from "@/lib/utils";
 
 // Home Page Sections
@@ -46,9 +46,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const isKm = locale === "km";
 
   try {
-    const seo = await prisma.pageSeo.findUnique({
-      where: { pageSlug: "home" },
-    });
+    const seo = await api.getPageSeo("home");
 
     if (seo) {
       const title = localized(seo as unknown as Record<string, unknown>, "title", locale);
@@ -157,87 +155,64 @@ export default async function HomePage({ params }: PageProps) {
 
   try {
     const [
-      dbSections,
+      dbSectionsMap,
       dbProducts,
       dbCategories,
       dbPromotions,
-      dbLocation,
+      dbLocations,
       dbGallery,
       dbTestimonials,
     ] = await Promise.all([
-      // 1. Home sections
-      prisma.homeSection.findMany({
-        where: { isVisible: true },
-        orderBy: { sortOrder: "asc" },
-      }),
-      // 2. Featured products
-      prisma.product.findMany({
-        where: {
-          isFeatured: true,
-          status: "PUBLISHED",
-        },
-        include: {
-          images: {
-            orderBy: { sortOrder: "asc" },
-            select: { url: true, altEn: true },
-          },
-        },
-        orderBy: { sortOrder: "asc" },
-        take: 8,
-      }),
-      // 3. Categories
-      prisma.category.findMany({
-        where: { isVisible: true },
-        orderBy: { sortOrder: "asc" },
-        take: 6,
-      }),
-      // 4. Active promotions for home
-      prisma.promotion.findMany({
-        where: {
-          showOnHome: true,
-          status: "PUBLISHED",
-        },
-        orderBy: { createdAt: "desc" },
-        take: 2,
-      }),
-      // 5. First bakery location
-      prisma.location.findFirst({
-        where: { isVisible: true },
-        orderBy: { sortOrder: "asc" },
-      }),
-      // 6. Gallery items for home
-      prisma.galleryItem.findMany({
-        where: { showOnHome: true },
-        orderBy: { sortOrder: "asc" },
-        take: 8,
-      }),
-      // 7. Visible testimonials
-      prisma.testimonial.findMany({
-        where: { isVisible: true },
-        orderBy: { sortOrder: "asc" },
-      }),
+      api.getHomeSections(),
+      api.getFavouriteProducts(),
+      api.getCategories(),
+      api.getHomePromotions(),
+      api.getLocations(),
+      api.getGallery(true),
+      api.getTestimonials(),
     ]);
 
-    homeSections = dbSections as any;
-    featuredProducts = (dbProducts as any[]).map((p: any) => ({
-      id: p.id,
-      nameEn: p.nameEn,
-      nameKm: p.nameKm,
-      slug: p.slug,
-      descriptionEn: p.descriptionEn,
-      descriptionKm: p.descriptionKm,
-      price: p.price,
-      badges: p.badges,
-      images: p.images,
-    }));
-    categories = dbCategories as any;
-    activePromotions = dbPromotions as any;
-    firstLocation = dbLocation as any;
-    galleryItems = dbGallery as any;
-    testimonials = dbTestimonials as any;
+    // homeSections comes keyed by section_key from the API — convert to array
+    if (dbSectionsMap) {
+      homeSections = Object.values(dbSectionsMap) as any;
+    }
+
+    if (dbProducts) {
+      featuredProducts = dbProducts.map((p) => ({
+        id: p.id,
+        nameEn: p.nameEn,
+        nameKm: p.nameKm,
+        slug: p.slug,
+        descriptionEn: p.descriptionEn,
+        descriptionKm: p.descriptionKm,
+        price: p.price,
+        badges: p.badges,
+        images: p.images,
+      }));
+    }
+
+    if (dbCategories) {
+      categories = dbCategories as any;
+    }
+
+    if (dbPromotions) {
+      activePromotions = dbPromotions as any;
+    }
+
+    if (dbLocations && dbLocations.length > 0) {
+      firstLocation = dbLocations[0] as any;
+    }
+
+    if (dbGallery) {
+      galleryItems = dbGallery as any;
+    }
+
+    if (dbTestimonials) {
+      testimonials = dbTestimonials as any;
+    }
   } catch (err: unknown) {
-    // Log gracefully in server output so build/dev doesn't crash if DB is not ready
-    console.warn("Notice: Prisma query fallback engaged for home page.", err);
+    // Log gracefully in server output so build/dev doesn't crash if API is not ready
+    console.warn("Notice: API query fallback engaged for home page.", err);
   }
 
   // Key-based section lookups

@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 
 const wholesaleSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters"),
@@ -53,16 +53,20 @@ export async function submitWholesaleEnquiry(
       .filter(Boolean)
       .join("\n\n");
 
-    await prisma.formSubmission.create({
-      data: {
-        name,
-        phone,
-        email: email || null,
-        type: "WHOLESALE",
-        message: fullMessage,
-        notes: `Business: ${businessName} | Interested in: ${interests.join(", ")}`,
-      },
+    const res = await api.submitContact({
+      name,
+      phone,
+      email: email || null,
+      type: "WHOLESALE",
+      message: fullMessage,
     });
+
+    if (!res.success) {
+      return {
+        success: false,
+        message: res.message || "Failed to submit enquiry. Please try again.",
+      };
+    }
 
     return {
       success: true,
@@ -116,15 +120,20 @@ export async function submitContactForm(
   const { name, phone, email, type, message } = validated.data;
 
   try {
-    await prisma.formSubmission.create({
-      data: {
-        name,
-        phone,
-        email: email || null,
-        type,
-        message,
-      },
+    const res = await api.submitContact({
+      name,
+      phone,
+      email: email || null,
+      type,
+      message,
     });
+
+    if (!res.success) {
+      return {
+        success: false,
+        message: res.message || "Unable to send message.",
+      };
+    }
 
     return {
       success: true,
