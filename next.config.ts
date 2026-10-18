@@ -21,8 +21,24 @@ const nextConfig: NextConfig = {
         hostname: "manage.nostbakery.com",
       },
       {
+        protocol: "http",
+        hostname: "manage.nostbakery.com",
+      },
+      {
+        protocol: "https",
+        hostname: "www.manage.nostbakery.com",
+      },
+      {
+        protocol: "http",
+        hostname: "www.manage.nostbakery.com",
+      },
+      {
         protocol: "https",
         hostname: "nostbakery.com",
+      },
+      {
+        protocol: "https",
+        hostname: "www.nostbakery.com",
       },
       {
         protocol: "https",
