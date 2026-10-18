@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { ProductEditor } from "../product-editor";
 
 export const dynamic = "force-dynamic";
@@ -11,18 +11,20 @@ interface EditProductPageProps {
 export default async function AdminEditProductPage({ params }: EditProductPageProps) {
   const { id } = await params;
 
-  const [product, categories] = await Promise.all([
-    prisma.product.findUnique({
-      where: { id },
-      include: {
-        category: true,
-        images: { orderBy: { sortOrder: "asc" } },
-      },
-    }),
-    prisma.category.findMany({
-      orderBy: { sortOrder: "asc" },
-    }),
-  ]);
+  let product: any = null;
+  let categories: any[] = [];
+
+  try {
+    const [allProducts, cats] = await Promise.all([
+      api.getProducts(),
+      api.getCategories(),
+    ]);
+    product = (allProducts ?? []).find((p) => String(p.id) === id || p.slug === id) ?? null;
+    categories = cats ?? [];
+  } catch {
+    product = null;
+    categories = [];
+  }
 
   if (!product) {
     notFound();

@@ -1,12 +1,15 @@
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { AnnouncementForm } from "./announcement-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminAnnouncementPage() {
-  const announcement = await prisma.announcementBar.findUnique({
-    where: { id: "default" },
-  });
+  let announcement: any = null;
+  try {
+    announcement = await api.getAnnouncement();
+  } catch {
+    announcement = null;
+  }
 
   return (
     <div className="space-y-6">

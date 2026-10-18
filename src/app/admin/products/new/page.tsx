@@ -1,16 +1,14 @@
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { ProductEditor } from "../product-editor";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminNewProductPage() {
-  const categories = await prisma.category.findMany({
-    orderBy: { sortOrder: "asc" },
-  });
+  const categories = (await api.getCategories()) ?? [];
 
   return (
     <div className="space-y-6">
-      <ProductEditor categories={categories} />
+      <ProductEditor categories={categories as any} />
     </div>
   );
 }

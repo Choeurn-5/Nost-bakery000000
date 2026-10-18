@@ -1,17 +1,19 @@
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { CategoryList } from "./category-list";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminCategoriesPage() {
-  const categories = await prisma.category.findMany({
-    orderBy: { sortOrder: "asc" },
-    include: {
-      _count: {
-        select: { products: true },
-      },
-    },
-  });
+  let categories: any[] = [];
+  try {
+    const data = await api.getCategories();
+    categories = (data ?? []).map((cat) => ({
+      ...cat,
+      _count: { products: cat.productsCount ?? 0 },
+    }));
+  } catch {
+    categories = [];
+  }
 
   return (
     <div className="space-y-6">

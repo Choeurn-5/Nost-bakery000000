@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { PromotionEditor } from "../promotion-editor";
 
 export const dynamic = "force-dynamic";
@@ -11,20 +11,28 @@ interface EditPromotionPageProps {
 export default async function AdminEditPromotionPage({ params }: EditPromotionPageProps) {
   const { id } = await params;
 
-  const [promotion, products] = await Promise.all([
-    prisma.promotion.findUnique({
-      where: { id },
-      include: {
-        products: {
-          include: { product: true },
-        },
-      },
-    }),
-    prisma.product.findMany({
-      where: { status: { not: "TRASHED" } },
-      orderBy: { nameEn: "asc" },
-    }),
-  ]);
+  let promotion: any = null;
+  let products: any[] = [];
+
+  try {
+    const [allPromos, allProducts] = await Promise.all([
+      api.getPromotions(),
+      api.getProducts(),
+    ]);
+    const found = (allPromos ?? []).find((p) => String(p.id) === id);
+    if (found) {
+      promotion = {
+        ...found,
+        products: (found.products ?? []).map((prod) => ({
+          product: prod,
+        })),
+      };
+    }
+    products = allProducts ?? [];
+  } catch {
+    promotion = null;
+    products = [];
+  }
 
   if (!promotion) {
     notFound();

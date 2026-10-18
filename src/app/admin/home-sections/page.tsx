@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { SectionsManager } from "./sections-manager";
 
 export const dynamic = "force-dynamic";
@@ -17,27 +17,38 @@ const DEFAULT_SECTIONS = [
 ];
 
 export default async function AdminHomeSectionsPage() {
-  let sections = await prisma.homeSection.findMany({
-    orderBy: { sortOrder: "asc" },
-  });
+  let sections: any[] = [];
+  try {
+    const data = await api.getHomeSections();
+    if (data && Object.keys(data).length > 0) {
+      sections = Object.values(data);
+    }
+  } catch {
+    sections = [];
+  }
 
-  // Seed default section keys if table is empty
   if (sections.length === 0) {
-    await prisma.$transaction(
-      DEFAULT_SECTIONS.map((sec) =>
-        prisma.homeSection.create({
-          data: {
-            sectionKey: sec.sectionKey,
-            headlineEn: sec.headlineEn,
-            sortOrder: sec.sortOrder,
-          },
-        })
-      )
-    );
-
-    sections = await prisma.homeSection.findMany({
-      orderBy: { sortOrder: "asc" },
-    });
+    sections = DEFAULT_SECTIONS.map((sec, idx) => ({
+      id: `default-${sec.sectionKey}`,
+      sectionKey: sec.sectionKey,
+      headlineEn: sec.headlineEn,
+      headlineKm: "",
+      subHeadlineEn: "",
+      subHeadlineKm: "",
+      bodyEn: "",
+      bodyKm: "",
+      buttonLabelEn: "",
+      buttonLabelKm: "",
+      buttonLink: "",
+      button2LabelEn: "",
+      button2LabelKm: "",
+      button2Link: "",
+      image: null,
+      videoUrl: null,
+      isVisible: true,
+      sortOrder: sec.sortOrder ?? idx,
+      extraData: null,
+    }));
   }
 
   return (

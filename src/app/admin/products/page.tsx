@@ -1,21 +1,23 @@
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { ProductsTable } from "./products-table";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminProductsPage() {
-  const [products, categories] = await Promise.all([
-    prisma.product.findMany({
-      orderBy: { sortOrder: "asc" },
-      include: {
-        category: true,
-        images: { orderBy: { sortOrder: "asc" } },
-      },
-    }),
-    prisma.category.findMany({
-      orderBy: { sortOrder: "asc" },
-    }),
-  ]);
+  let products: any[] = [];
+  let categories: any[] = [];
+
+  try {
+    const [prods, cats] = await Promise.all([
+      api.getProducts(),
+      api.getCategories(),
+    ]);
+    products = prods ?? [];
+    categories = cats ?? [];
+  } catch {
+    products = [];
+    categories = [];
+  }
 
   return (
     <div className="space-y-6">

@@ -1,12 +1,16 @@
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { SettingsForm } from "./settings-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminSettingsPage() {
-  const settings = await prisma.siteSettings.findUnique({
-    where: { id: "default" },
-  });
+  let settings: any = null;
+  try {
+    const data = await api.getSettings();
+    settings = data?.settings ?? null;
+  } catch {
+    settings = null;
+  }
 
   return (
     <div className="space-y-6">

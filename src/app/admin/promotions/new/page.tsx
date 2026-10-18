@@ -1,17 +1,14 @@
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { PromotionEditor } from "../promotion-editor";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminNewPromotionPage() {
-  const products = await prisma.product.findMany({
-    where: { status: { not: "TRASHED" } },
-    orderBy: { nameEn: "asc" },
-  });
+  const products = (await api.getProducts()) ?? [];
 
   return (
     <div className="space-y-6">
-      <PromotionEditor availableProducts={products} />
+      <PromotionEditor availableProducts={products as any} />
     </div>
   );
 }

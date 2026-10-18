@@ -22,7 +22,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-warm-white text-espresso antialiased">
+      <body suppressHydrationWarning className="min-h-screen bg-warm-white text-espresso antialiased">
         {children}
       </body>
     </html>

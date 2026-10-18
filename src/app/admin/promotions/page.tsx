@@ -1,17 +1,21 @@
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { PromotionsTable } from "./promotions-table";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPromotionsPage() {
-  const promotions = await prisma.promotion.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      products: {
-        include: { product: true },
-      },
-    },
-  });
+  let promotions: any[] = [];
+  try {
+    const data = await api.getPromotions();
+    promotions = (data ?? []).map((p) => ({
+      ...p,
+      products: (p.products ?? []).map((prod) => ({
+        product: prod,
+      })),
+    }));
+  } catch {
+    promotions = [];
+  }
 
   return (
     <div className="space-y-6">
