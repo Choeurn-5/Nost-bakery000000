@@ -4,6 +4,8 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { FileText, Save, Loader2, Globe } from "lucide-react";
+import { ImageUpload } from "@/components/admin/image-upload";
+
 
 const STANDARD_PAGES = [
   { slug: "home", label: "Home Page" },
@@ -230,15 +232,11 @@ export function PagesSeoClient({ initialPages }: { initialPages: PageSeoItem[] }
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-[#3A2418] uppercase tracking-wider mb-1.5">
-              Open Graph (Social Share) Image URL
-            </label>
-            <input
-              type="text"
+            <ImageUpload
+              label="Open Graph (Social Share) Image (Upload from Device)"
               value={currentForm.ogImage || currentForm.og_image || ""}
-              onChange={(e) => handleChange("ogImage", e.target.value)}
-              placeholder="https://..."
-              className="w-full px-3.5 py-2.5 rounded-lg border border-[#3A2418]/20 bg-[#FAF6F0]/30 text-sm focus:outline-hidden focus:ring-2 focus:ring-[#6A9A8A]"
+              onChange={(url) => handleChange("ogImage", url)}
+              placeholderText={`${selectedSlug.toUpperCase()} Social`}
             />
           </div>
 

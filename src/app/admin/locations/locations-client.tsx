@@ -4,6 +4,8 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { MapPin, Plus, Trash2, Edit2, Save, X, Loader2 } from "lucide-react";
+import { ImageUpload } from "@/components/admin/image-upload";
+
 
 interface LocationItem {
   id: string | number;
@@ -175,6 +177,15 @@ export function LocationsClient({ initialLocations }: { initialLocations: Locati
                 className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-[#C98A3D]/20 text-[#3A2418]"
               />
             </div>
+          </div>
+
+          <div>
+            <ImageUpload
+              label="Branch Photo / Storefront (Upload from Device)"
+              value={editingItem.image}
+              onChange={(url) => setEditingItem({ ...editingItem, image: url })}
+              placeholderText="Branch Storefront"
+            />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

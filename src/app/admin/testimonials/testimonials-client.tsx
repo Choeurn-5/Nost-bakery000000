@@ -4,6 +4,8 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { MessageSquare, Plus, Trash2, Edit2, Save, X, Loader2, Star } from "lucide-react";
+import { ImageUpload } from "@/components/admin/image-upload";
+
 
 interface TestimonialItem {
   id: string | number;
@@ -137,6 +139,15 @@ export function TestimonialsClient({ initialItems }: { initialItems: Testimonial
               value={editingItem.textEn || ""}
               onChange={(e) => setEditingItem({ ...editingItem, textEn: e.target.value })}
               className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-[#C98A3D]/20 text-[#3A2418]"
+            />
+          </div>
+
+          <div>
+            <ImageUpload
+              label="Customer Avatar / Photo (Upload from Device)"
+              value={editingItem.photo}
+              onChange={(url) => setEditingItem({ ...editingItem, photo: url })}
+              placeholderText="Guest Avatar"
             />
           </div>
 

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { Image as ImageIcon, Plus, Trash2, Save, X, Loader2 } from "lucide-react";
+import { ImageUpload } from "@/components/admin/image-upload";
+
 
 interface GalleryItem {
   id: string | number;
@@ -93,20 +95,15 @@ export function GalleryClient({ initialItems }: { initialItems: GalleryItem[] })
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <ImageUpload
+              label="Gallery Photograph (Upload from Device)"
+              value={newItemUrl}
+              onChange={setNewItemUrl}
+              placeholderText="Bakery Gallery"
+            />
             <div>
-              <label className="block text-xs font-semibold text-[#3A2418] mb-1">Image URL</label>
-              <input
-                type="text"
-                required
-                value={newItemUrl}
-                onChange={(e) => setNewItemUrl(e.target.value)}
-                placeholder="https://images.unsplash.com/..."
-                className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-[#C98A3D]/20 text-[#3A2418]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[#3A2418] mb-1">Caption</label>
+              <label className="block text-xs font-semibold text-[#3A2418] mb-1">Caption / Description</label>
               <input
                 type="text"
                 value={caption}

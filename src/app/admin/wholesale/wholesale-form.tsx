@@ -4,6 +4,7 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { Save, Loader2, Truck } from "lucide-react";
+import { ImageUpload } from "@/components/admin/image-upload";
 
 export function WholesaleForm({ initialData }: { initialData: any }) {
   const [isPending, setIsPending] = useState(false);
@@ -12,6 +13,7 @@ export function WholesaleForm({ initialData }: { initialData: any }) {
     heroHeadlineKm: initialData?.heroHeadlineKm || "ការផ្គត់ផ្គង់នំប៉័ងសម្រាប់អាជីវកម្មរបស់អ្នក",
     heroSubHeadlineEn: initialData?.heroSubHeadlineEn || "Fresh daily wholesale delivery for hotels, cafes, and restaurants across Siem Reap.",
     heroSubHeadlineKm: initialData?.heroSubHeadlineKm || "",
+    heroImage: initialData?.heroImage || initialData?.hero_image || "",
     deliveryCoverageEn: initialData?.deliveryCoverageEn || "Daily morning delivery in Siem Reap town center and hotel zone.",
     deliveryCoverageKm: initialData?.deliveryCoverageKm || "",
     minimumOrderTextEn: initialData?.minimumOrderTextEn || "Minimum $30 per delivery order.",
@@ -85,6 +87,15 @@ export function WholesaleForm({ initialData }: { initialData: any }) {
               className="w-full px-3 py-2 text-xs rounded-xl bg-[#FBF7F1] border border-[#C98A3D]/20 text-[#3A2418]"
             />
           </div>
+        </div>
+
+        <div>
+          <ImageUpload
+            label="Wholesale Hero Background Banner (Upload from Device)"
+            value={formData.heroImage}
+            onChange={(url) => setFormData({ ...formData, heroImage: url })}
+            placeholderText="Wholesale Supply"
+          />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

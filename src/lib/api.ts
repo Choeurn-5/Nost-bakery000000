@@ -730,17 +730,41 @@ export const api = {
   // Activity Log
   getAdminActivityLogs: () =>
     adminFetch<any[]>("/activity-log"),
-
   logActivity: (data: {
-    userId?: string;
-    userEmail?: string;
-    userName?: string;
+    userId: string;
     action: string;
     entity: string;
     entityId?: string | null;
     details?: string | null;
   }) =>
     adminFetch<any>("/activity-log", { method: "POST", body: data }),
+
+  // Direct File Upload from Device
+  uploadImage: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      return json as {
+        success: boolean;
+        url?: string;
+        filename?: string;
+        size?: number;
+        width?: number;
+        height?: number;
+        error?: string;
+      };
+    } catch (err: unknown) {
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "Network error uploading image",
+      };
+    }
+  },
 };
 
 export const adminApi = api;

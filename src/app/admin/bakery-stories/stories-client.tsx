@@ -4,6 +4,8 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { BookOpen, Plus, Trash2, Edit2, Save, X, Loader2 } from "lucide-react";
+import { ImageUpload } from "@/components/admin/image-upload";
+
 
 interface StoryItem {
   id: string | number;
@@ -153,13 +155,11 @@ export function StoriesClient({ initialStories }: { initialStories: StoryItem[] 
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-[#3A2418] mb-1">Image URL</label>
-            <input
-              type="text"
-              value={editingItem.image || ""}
-              onChange={(e) => setEditingItem({ ...editingItem, image: e.target.value })}
-              placeholder="https://images.unsplash.com/..."
-              className="w-full px-3 py-2 text-xs rounded-xl bg-white border border-[#C98A3D]/20 text-[#3A2418]"
+            <ImageUpload
+              label="Story Illustration / Photograph (Upload from Device)"
+              value={editingItem.image}
+              onChange={(url) => setEditingItem({ ...editingItem, image: url })}
+              placeholderText="Bakery Craft"
             />
           </div>
 
