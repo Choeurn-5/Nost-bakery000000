@@ -6,8 +6,9 @@ export const dynamic = "force-dynamic";
 export default async function AdminCategoriesPage() {
   let categories: any[] = [];
   try {
-    const data = await api.getCategories();
-    categories = (data ?? []).map((cat) => ({
+    const res = await api.getAdminCategories();
+    const data = res?.data ?? (await api.getCategories()) ?? [];
+    categories = data.map((cat: any) => ({
       ...cat,
       _count: { products: cat.productsCount ?? 0 },
     }));

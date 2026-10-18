@@ -2,10 +2,11 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { getAuthenticatedUser, logActivity } from "@/lib/auth-check";
 
 const homeSectionSchema = z.object({
+  sectionKey: z.string().optional(),
   headlineEn: z.string().default(""),
   headlineKm: z.string().default(""),
   subHeadlineEn: z.string().default(""),
@@ -23,46 +24,52 @@ const homeSectionSchema = z.object({
   isVisible: z.boolean().default(true),
 });
 
-export async function updateHomeSection(id: string, input: z.infer<typeof homeSectionSchema>) {
+export async function updateHomeSection(id: string | number, input: z.input<typeof homeSectionSchema>) {
   try {
     const user = await getAuthenticatedUser();
     const validated = homeSectionSchema.parse(input);
 
-    const section = await prisma.homeSection.update({
-      where: { id },
-      data: validated,
+    const res = await api.saveHomeSection({
+      id,
+      sectionKey: validated.sectionKey || String(id),
+      ...validated,
     });
+
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update home section" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "updated home section",
       entity: "HomeSection",
-      entityId: id,
-      details: `Updated section "${section.sectionKey}"`,
+      entityId: String(id),
+      details: `Updated section "${res.data?.sectionKey || id}"`,
     });
 
     revalidatePath("/admin/home-sections");
     revalidatePath("/", "layout");
 
-    return { success: true, data: section };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update home section";
     return { success: false, error: msg };
   }
 }
 
-export async function reorderHomeSections(orderedIds: string[]) {
+export async function reorderHomeSections(orderedIds: Array<string | number>) {
   try {
     const user = await getAuthenticatedUser();
 
-    await prisma.$transaction(
-      orderedIds.map((id, index) =>
-        prisma.homeSection.update({
-          where: { id },
-          data: { sortOrder: index },
-        })
-      )
-    );
+    const items = orderedIds.map((id, index) => ({
+      id,
+      sortOrder: index,
+    }));
+
+    const res = await api.reorderHomeSections(items);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to reorder home sections" };
+    }
 
     await logActivity({
       userId: user.id,

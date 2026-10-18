@@ -97,6 +97,70 @@ async function apiPost<T>(
   }
 }
 
+// ─── camelCase → snake_case transformer (for requests to Laravel) ───
+
+function camelToSnake(str: string): string {
+  return str.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
+}
+
+function toSnakeCaseKeys(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) return obj.map(toSnakeCaseKeys);
+  if (typeof obj === "object" && obj !== null && !(obj instanceof Date)) {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      result[camelToSnake(key)] = toSnakeCaseKeys(value);
+    }
+    return result;
+  }
+  return obj;
+}
+
+// ─── Admin fetch helper (with X-Admin-Secret authorization) ───
+
+const ADMIN_SECRET = process.env.ADMIN_API_SECRET || "nost-bakery-internal-admin-secret-2025";
+
+async function adminFetch<T>(
+  path: string,
+  options?: {
+    method?: string;
+    body?: Record<string, unknown>;
+  }
+): Promise<{ success: boolean; data?: T; message?: string; error?: string }> {
+  try {
+    const url = `${API_BASE}/api/admin${path}`;
+    const method = options?.method || "GET";
+    const body = options?.body ? JSON.stringify(toSnakeCaseKeys(options.body)) : undefined;
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "X-Admin-Secret": ADMIN_SECRET,
+      },
+      body,
+      cache: "no-store",
+    });
+
+    const json = await res.json().catch(() => null);
+
+    if (!res.ok || (json && !json.success)) {
+      const errMsg = json?.message || `Admin API error: ${res.status} ${res.statusText}`;
+      return { success: false, error: errMsg };
+    }
+
+    return {
+      success: true,
+      data: json?.data ? (transformKeys(json.data) as T) : undefined,
+      message: json?.message,
+    };
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : "Network error contacting Admin API";
+    return { success: false, error: errMsg };
+  }
+}
+
 // ─── Type definitions for API responses ───
 
 export interface ApiHomeSection {
@@ -217,6 +281,9 @@ export interface ApiSettings {
     isActive: boolean;
   } | null;
 }
+
+export type ApiSiteSettings = NonNullable<ApiSettings["settings"]>;
+export type ApiAnnouncement = NonNullable<ApiSettings["announcement"]>;
 
 export interface ApiLocation {
   id: string;
@@ -410,4 +477,124 @@ export const api = {
   // Contact
   submitContact: (data: Record<string, unknown>) =>
     apiPost("/contact", data),
+
+  // ─── Admin API Operations (Connected directly to Laravel) ───
+  getAdminStats: () =>
+    adminFetch<{
+      counts: {
+        products: number;
+        publishedProducts: number;
+        featuredProducts: number;
+        outOfStock: number;
+        categories: number;
+        promotions: number;
+        submissions: number;
+        unreadSubmissions: number;
+        orders: number;
+        pendingOrders: number;
+      };
+      recentSubmissions: any[];
+      recentProducts: any[];
+    }>("/stats"),
+
+  // Products
+  getAdminProducts: (params?: { category?: string; status?: string; search?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.category) searchParams.set("category", params.category);
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.search) searchParams.set("search", params.search);
+    const qs = searchParams.toString();
+    return adminFetch<any[]>(`/products${qs ? `?${qs}` : ""}`);
+  },
+
+  getAdminProduct: (id: string | number) =>
+    adminFetch<any>(`/products/${id}`),
+
+  createProduct: (data: Record<string, unknown>) =>
+    adminFetch<any>("/products", { method: "POST", body: data }),
+
+  updateProduct: (id: string | number, data: Record<string, unknown>) =>
+    adminFetch<any>(`/products/${id}`, { method: "PUT", body: data }),
+
+  deleteProduct: (id: string | number, force?: boolean) =>
+    adminFetch(`/products/${id}${force ? "?force=1" : ""}`, { method: "DELETE" }),
+
+  reorderProducts: (items: Array<{ id: string | number; sortOrder: number }>) =>
+    adminFetch("/products/reorder", { method: "POST", body: { items } }),
+
+  // Categories
+  getAdminCategories: () =>
+    adminFetch<any[]>("/categories"),
+
+  getAdminCategory: (id: string | number) =>
+    adminFetch<any>(`/categories/${id}`),
+
+  createCategory: (data: Record<string, unknown>) =>
+    adminFetch<any>("/categories", { method: "POST", body: data }),
+
+  updateCategory: (id: string | number, data: Record<string, unknown>) =>
+    adminFetch<any>(`/categories/${id}`, { method: "PUT", body: data }),
+
+  deleteCategory: (id: string | number, force?: boolean) =>
+    adminFetch(`/categories/${id}${force ? "?force=1" : ""}`, { method: "DELETE" }),
+
+  reorderCategories: (items: Array<{ id: string | number; sortOrder: number }>) =>
+    adminFetch("/categories/reorder", { method: "POST", body: { items } }),
+
+  // Promotions
+  getAdminPromotions: () =>
+    adminFetch<any[]>("/promotions"),
+
+  getAdminPromotion: (id: string | number) =>
+    adminFetch<any>(`/promotions/${id}`),
+
+  createPromotion: (data: Record<string, unknown>) =>
+    adminFetch<any>("/promotions", { method: "POST", body: data }),
+
+  updatePromotion: (id: string | number, data: Record<string, unknown>) =>
+    adminFetch<any>(`/promotions/${id}`, { method: "PUT", body: data }),
+
+  deletePromotion: (id: string | number) =>
+    adminFetch(`/promotions/${id}`, { method: "DELETE" }),
+
+  // Site Settings & Announcement Bar
+  getAdminSettings: () =>
+    adminFetch<ApiSiteSettings>("/settings"),
+
+  updateSettings: (data: Record<string, unknown>) =>
+    adminFetch<ApiSiteSettings>("/settings", { method: "POST", body: data }),
+
+  getAdminAnnouncement: () =>
+    adminFetch<ApiAnnouncement>("/announcement"),
+
+  updateAnnouncement: (data: Record<string, unknown>) =>
+    adminFetch<ApiAnnouncement>("/announcement", { method: "POST", body: data }),
+
+  // Home Sections
+  getAdminHomeSections: () =>
+    adminFetch<ApiHomeSection[]>("/home-sections"),
+
+  saveHomeSection: (data: Record<string, unknown>) =>
+    adminFetch<ApiHomeSection>("/home-sections", { method: "POST", body: data }),
+
+  deleteHomeSection: (id: string | number) =>
+    adminFetch(`/home-sections/${id}`, { method: "DELETE" }),
+
+  reorderHomeSections: (items: Array<{ id: string | number; sortOrder: number }>) =>
+    adminFetch("/home-sections/reorder", { method: "POST", body: { items } }),
+
+  // Inbox & Submissions
+  getAdminInbox: (params?: { type?: string; status?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.type) searchParams.set("type", params.type);
+    if (params?.status) searchParams.set("status", params.status);
+    const qs = searchParams.toString();
+    return adminFetch<any[]>(`/inbox${qs ? `?${qs}` : ""}`);
+  },
+
+  updateInboxItem: (id: string | number, data: Record<string, unknown>) =>
+    adminFetch(`/inbox/${id}`, { method: "PUT", body: data }),
+
+  deleteInboxItem: (id: string | number) =>
+    adminFetch(`/inbox/${id}`, { method: "DELETE" }),
 };

@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 export default async function AdminAnnouncementPage() {
   let announcement: any = null;
   try {
-    announcement = await api.getAnnouncement();
+    const res = await api.getAdminAnnouncement();
+    announcement = res?.data ?? (await api.getAnnouncement()) ?? null;
   } catch {
     announcement = null;
   }

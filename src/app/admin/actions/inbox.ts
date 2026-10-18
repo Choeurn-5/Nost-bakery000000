@@ -1,76 +1,78 @@
 "use server";
 
-import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { getAuthenticatedUser, logActivity } from "@/lib/auth-check";
 import { SubmissionStatus } from "@prisma/client";
 
-export async function updateSubmissionStatus(id: string, status: SubmissionStatus) {
+export async function updateSubmissionStatus(id: string | number, status: SubmissionStatus | string) {
   try {
     const user = await getAuthenticatedUser();
 
-    const submission = await prisma.formSubmission.update({
-      where: { id },
-      data: { status },
-    });
+    const res = await api.updateInboxItem(id, { status });
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update status" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "updated submission status",
       entity: "FormSubmission",
-      entityId: id,
-      details: `Status changed to ${status} for ${submission.name}`,
+      entityId: String(id),
+      details: `Status changed to ${status}`,
     });
 
     revalidatePath("/admin/inbox");
     revalidatePath("/admin");
 
-    return { success: true, data: submission };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update status";
     return { success: false, error: msg };
   }
 }
 
-export async function updateSubmissionNotes(id: string, notes: string) {
+export async function updateSubmissionNotes(id: string | number, notes: string) {
   try {
     const user = await getAuthenticatedUser();
 
-    const submission = await prisma.formSubmission.update({
-      where: { id },
-      data: { notes },
-    });
+    const res = await api.updateInboxItem(id, { notes });
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to save notes" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "updated submission notes",
       entity: "FormSubmission",
-      entityId: id,
-      details: `Notes updated for ${submission.name}`,
+      entityId: String(id),
+      details: `Notes updated`,
     });
 
     revalidatePath("/admin/inbox");
 
-    return { success: true, data: submission };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to save notes";
     return { success: false, error: msg };
   }
 }
 
-export async function deleteSubmission(id: string) {
+export async function deleteSubmission(id: string | number) {
   try {
     const user = await getAuthenticatedUser();
 
-    const submission = await prisma.formSubmission.delete({ where: { id } });
+    const res = await api.deleteInboxItem(id);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to delete submission" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "deleted submission",
       entity: "FormSubmission",
-      entityId: id,
-      details: `Deleted submission from ${submission.name}`,
+      entityId: String(id),
+      details: `Deleted submission ID ${id}`,
     });
 
     revalidatePath("/admin/inbox");
@@ -87,21 +89,20 @@ export async function exportCsvAction() {
   try {
     await getAuthenticatedUser();
 
-    const submissions = await prisma.formSubmission.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+    const res = await api.getAdminInbox();
+    const submissions: any[] = res.data ?? [];
 
     const headers = ["ID", "Name", "Phone", "Email", "Type", "Status", "Message", "Notes", "Created At"];
     const rows = submissions.map((s) => [
       s.id,
-      `"${s.name.replace(/"/g, '""')}"`,
-      `"${s.phone}"`,
+      `"${(s.name || "").replace(/"/g, '""')}"`,
+      `"${s.phone || ""}"`,
       `"${s.email || ""}"`,
-      s.type,
-      s.status,
-      `"${s.message.replace(/"/g, '""')}"`,
-      `"${s.notes.replace(/"/g, '""')}"`,
-      s.createdAt.toISOString(),
+      s.type || s.formType || "CONTACT",
+      s.status || "NEW",
+      `"${(s.message || "").replace(/"/g, '""')}"`,
+      `"${(s.notes || "").replace(/"/g, '""')}"`,
+      s.createdAt ? new Date(s.createdAt).toISOString() : "",
     ]);
 
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");

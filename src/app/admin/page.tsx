@@ -21,17 +21,26 @@ export default async function AdminDashboardPage() {
   let publishedProductsCount = 0;
   let activePromotionsCount = 0;
   let categoriesCount = 0;
-  const recentSubmissions: any[] = [];
+  let recentSubmissions: any[] = [];
 
   try {
-    const [prods, cats, promos] = await Promise.all([
-      api.getProducts(),
-      api.getCategories(),
-      api.getPromotions(),
-    ]);
-    publishedProductsCount = prods?.length ?? 0;
-    categoriesCount = cats?.length ?? 0;
-    activePromotionsCount = promos?.length ?? 0;
+    const statsRes = await api.getAdminStats();
+    if (statsRes.success && statsRes.data) {
+      newEnquiriesCount = statsRes.data.counts.unreadSubmissions ?? 0;
+      publishedProductsCount = statsRes.data.counts.publishedProducts ?? statsRes.data.counts.products ?? 0;
+      activePromotionsCount = statsRes.data.counts.promotions ?? 0;
+      categoriesCount = statsRes.data.counts.categories ?? 0;
+      recentSubmissions = statsRes.data.recentSubmissions ?? [];
+    } else {
+      const [prods, cats, promos] = await Promise.all([
+        api.getProducts(),
+        api.getCategories(),
+        api.getPromotions(),
+      ]);
+      publishedProductsCount = prods?.length ?? 0;
+      categoriesCount = cats?.length ?? 0;
+      activePromotionsCount = promos?.length ?? 0;
+    }
   } catch {
     // offline fallback
   }

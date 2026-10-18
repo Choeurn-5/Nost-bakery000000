@@ -19,9 +19,14 @@ const DEFAULT_SECTIONS = [
 export default async function AdminHomeSectionsPage() {
   let sections: any[] = [];
   try {
-    const data = await api.getHomeSections();
-    if (data && Object.keys(data).length > 0) {
-      sections = Object.values(data);
+    const res = await api.getAdminHomeSections();
+    if (res?.data && res.data.length > 0) {
+      sections = res.data;
+    } else {
+      const data = await api.getHomeSections();
+      if (data && Object.keys(data).length > 0) {
+        sections = Object.values(data);
+      }
     }
   } catch {
     sections = [];

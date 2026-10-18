@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { getAuthenticatedUser, logActivity } from "@/lib/auth-check";
 
 const siteSettingsSchema = z.object({
@@ -28,19 +28,16 @@ const siteSettingsSchema = z.object({
   footerTextKm: z.string().default(""),
 });
 
-export async function updateSiteSettings(formData: z.infer<typeof siteSettingsSchema>) {
+export async function updateSiteSettings(formData: z.input<typeof siteSettingsSchema>) {
   try {
     const user = await getAuthenticatedUser();
     const validated = siteSettingsSchema.parse(formData);
 
-    const updated = await prisma.siteSettings.upsert({
-      where: { id: "default" },
-      update: validated,
-      create: {
-        id: "default",
-        ...validated,
-      },
-    });
+    const res = await api.updateSettings(validated as Record<string, unknown>);
+
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update settings" };
+    }
 
     await logActivity({
       userId: user.id,
@@ -53,7 +50,7 @@ export async function updateSiteSettings(formData: z.infer<typeof siteSettingsSc
     revalidatePath("/admin/settings");
     revalidatePath("/", "layout");
 
-    return { success: true, data: updated };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update settings";
     return { success: false, error: msg };
@@ -69,31 +66,23 @@ const announcementSchema = z.object({
   endDate: z.string().nullable().optional(),
 });
 
-export async function updateAnnouncementBar(formData: z.infer<typeof announcementSchema>) {
+export async function updateAnnouncementBar(formData: z.input<typeof announcementSchema>) {
   try {
     const user = await getAuthenticatedUser();
     const validated = announcementSchema.parse(formData);
 
-    const updated = await prisma.announcementBar.upsert({
-      where: { id: "default" },
-      update: {
-        textEn: validated.textEn,
-        textKm: validated.textKm,
-        link: validated.link || null,
-        isActive: validated.isActive,
-        startDate: validated.startDate ? new Date(validated.startDate) : null,
-        endDate: validated.endDate ? new Date(validated.endDate) : null,
-      },
-      create: {
-        id: "default",
-        textEn: validated.textEn,
-        textKm: validated.textKm,
-        link: validated.link || null,
-        isActive: validated.isActive,
-        startDate: validated.startDate ? new Date(validated.startDate) : null,
-        endDate: validated.endDate ? new Date(validated.endDate) : null,
-      },
+    const res = await api.updateAnnouncement({
+      textEn: validated.textEn,
+      textKm: validated.textKm,
+      link: validated.link || null,
+      isActive: validated.isActive,
+      startDate: validated.startDate || null,
+      endDate: validated.endDate || null,
     });
+
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update announcement" };
+    }
 
     await logActivity({
       userId: user.id,
@@ -106,7 +95,7 @@ export async function updateAnnouncementBar(formData: z.infer<typeof announcemen
     revalidatePath("/admin/announcement");
     revalidatePath("/", "layout");
 
-    return { success: true, data: updated };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update announcement";
     return { success: false, error: msg };

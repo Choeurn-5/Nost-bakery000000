@@ -6,8 +6,8 @@ export const dynamic = "force-dynamic";
 export default async function AdminSettingsPage() {
   let settings: any = null;
   try {
-    const data = await api.getSettings();
-    settings = data?.settings ?? null;
+    const res = await api.getAdminSettings();
+    settings = res?.data ?? (await api.getSettings())?.settings ?? null;
   } catch {
     settings = null;
   }

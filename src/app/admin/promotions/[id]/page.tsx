@@ -15,20 +15,20 @@ export default async function AdminEditPromotionPage({ params }: EditPromotionPa
   let products: any[] = [];
 
   try {
-    const [allPromos, allProducts] = await Promise.all([
-      api.getPromotions(),
-      api.getProducts(),
+    const [promoRes, prodsRes] = await Promise.all([
+      api.getAdminPromotion(id),
+      api.getAdminProducts(),
     ]);
-    const found = (allPromos ?? []).find((p) => String(p.id) === id);
+    const found = promoRes?.data;
     if (found) {
       promotion = {
         ...found,
-        products: (found.products ?? []).map((prod) => ({
+        products: (found.products ?? []).map((prod: any) => ({
           product: prod,
         })),
       };
     }
-    products = allProducts ?? [];
+    products = prodsRes?.data ?? [];
   } catch {
     promotion = null;
     products = [];

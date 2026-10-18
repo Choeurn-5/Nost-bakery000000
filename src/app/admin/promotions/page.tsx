@@ -6,10 +6,11 @@ export const dynamic = "force-dynamic";
 export default async function AdminPromotionsPage() {
   let promotions: any[] = [];
   try {
-    const data = await api.getPromotions();
-    promotions = (data ?? []).map((p) => ({
+    const res = await api.getAdminPromotions();
+    const data = res?.data ?? (await api.getPromotions()) ?? [];
+    promotions = data.map((p: any) => ({
       ...p,
-      products: (p.products ?? []).map((prod) => ({
+      products: (p.products ?? []).map((prod: any) => ({
         product: prod,
       })),
     }));

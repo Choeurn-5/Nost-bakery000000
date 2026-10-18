@@ -2,12 +2,11 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { getAuthenticatedUser, logActivity } from "@/lib/auth-check";
-import slugify from "slugify";
 
 const categorySchema = z.object({
-  id: z.string().optional(),
+  id: z.union([z.string(), z.number()]).optional(),
   nameEn: z.string().min(1, "English name is required"),
   nameKm: z.string().default(""),
   slug: z.string().optional(),
@@ -23,133 +22,117 @@ export async function createCategory(input: z.input<typeof categorySchema>) {
     const user = await getAuthenticatedUser();
     const validated = categorySchema.parse(input);
 
-    const slug = validated.slug && validated.slug.trim()
-      ? slugify(validated.slug, { lower: true, strict: true })
-      : slugify(validated.nameEn, { lower: true, strict: true });
-
-    // Check slug uniqueness
-    const existing = await prisma.category.findUnique({ where: { slug } });
-    const finalSlug = existing ? `${slug}-${Date.now()}` : slug;
-
-    const count = await prisma.category.count();
-
-    const category = await prisma.category.create({
-      data: {
-        nameEn: validated.nameEn,
-        nameKm: validated.nameKm,
-        slug: finalSlug,
-        image: validated.image || null,
-        imageAltEn: validated.imageAltEn,
-        imageAltKm: validated.imageAltKm,
-        isVisible: validated.isVisible,
-        sortOrder: validated.sortOrder || count,
-      },
+    const res = await api.createCategory({
+      nameEn: validated.nameEn,
+      nameKm: validated.nameKm,
+      slug: validated.slug || undefined,
+      image: validated.image || null,
+      imageAltEn: validated.imageAltEn,
+      imageAltKm: validated.imageAltKm,
+      isVisible: validated.isVisible,
+      sortOrder: validated.sortOrder,
     });
+
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to create category" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "created category",
       entity: "Category",
-      entityId: category.id,
-      details: `Created category "${category.nameEn}" (${category.slug})`,
+      entityId: res.data?.id ? String(res.data.id) : null,
+      details: `Created category "${validated.nameEn}"`,
     });
 
     revalidatePath("/admin/categories");
     revalidatePath("/", "layout");
 
-    return { success: true, data: category };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to create category";
     return { success: false, error: msg };
   }
 }
 
-export async function updateCategory(id: string, input: z.input<typeof categorySchema>) {
+export async function updateCategory(id: string | number, input: z.input<typeof categorySchema>) {
   try {
     const user = await getAuthenticatedUser();
     const validated = categorySchema.parse(input);
 
-    const slug = validated.slug && validated.slug.trim()
-      ? slugify(validated.slug, { lower: true, strict: true })
-      : slugify(validated.nameEn, { lower: true, strict: true });
-
-    const category = await prisma.category.update({
-      where: { id },
-      data: {
-        nameEn: validated.nameEn,
-        nameKm: validated.nameKm,
-        slug,
-        image: validated.image || null,
-        imageAltEn: validated.imageAltEn,
-        imageAltKm: validated.imageAltKm,
-        isVisible: validated.isVisible,
-        sortOrder: validated.sortOrder,
-      },
+    const res = await api.updateCategory(id, {
+      nameEn: validated.nameEn,
+      nameKm: validated.nameKm,
+      slug: validated.slug || undefined,
+      image: validated.image || null,
+      imageAltEn: validated.imageAltEn,
+      imageAltKm: validated.imageAltKm,
+      isVisible: validated.isVisible,
+      sortOrder: validated.sortOrder,
     });
+
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update category" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "updated category",
       entity: "Category",
-      entityId: category.id,
-      details: `Updated category "${category.nameEn}"`,
+      entityId: String(id),
+      details: `Updated category "${validated.nameEn}"`,
     });
 
     revalidatePath("/admin/categories");
     revalidatePath("/", "layout");
 
-    return { success: true, data: category };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update category";
     return { success: false, error: msg };
   }
 }
 
-export async function deleteCategory(id: string) {
+export async function deleteCategory(id: string | number) {
   try {
     const user = await getAuthenticatedUser();
 
-    // Check if category has products
-    const productCount = await prisma.product.count({ where: { categoryId: id } });
-    if (productCount > 0) {
-      return {
-        success: false,
-        error: `Cannot delete category with ${productCount} active product(s). Please reassign or delete them first.`,
-      };
+    const res = await api.deleteCategory(id);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to delete category" };
     }
-
-    const category = await prisma.category.delete({ where: { id } });
 
     await logActivity({
       userId: user.id,
       action: "deleted category",
       entity: "Category",
-      entityId: id,
-      details: `Deleted category "${category.nameEn}"`,
+      entityId: String(id),
+      details: `Deleted category ID ${id}`,
     });
 
     revalidatePath("/admin/categories");
     revalidatePath("/", "layout");
 
-    return { success: true, data: category };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to delete category";
     return { success: false, error: msg };
   }
 }
 
-export async function reorderCategories(orderedIds: string[]) {
+export async function reorderCategories(orderedIds: Array<string | number>) {
   try {
     const user = await getAuthenticatedUser();
 
-    await prisma.$transaction(
-      orderedIds.map((id, index) =>
-        prisma.category.update({
-          where: { id },
-          data: { sortOrder: index },
-        })
-      )
-    );
+    const items = orderedIds.map((id, index) => ({
+      id,
+      sortOrder: index,
+    }));
+
+    const res = await api.reorderCategories(items);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to reorder categories" };
+    }
 
     await logActivity({
       userId: user.id,

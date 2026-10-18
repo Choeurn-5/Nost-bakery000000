@@ -8,12 +8,12 @@ export default async function AdminProductsPage() {
   let categories: any[] = [];
 
   try {
-    const [prods, cats] = await Promise.all([
-      api.getProducts(),
-      api.getCategories(),
+    const [prodsRes, catsRes] = await Promise.all([
+      api.getAdminProducts(),
+      api.getAdminCategories(),
     ]);
-    products = prods ?? [];
-    categories = cats ?? [];
+    products = prodsRes?.data ?? [];
+    categories = catsRes?.data ?? [];
   } catch {
     products = [];
     categories = [];

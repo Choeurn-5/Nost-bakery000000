@@ -15,12 +15,12 @@ export default async function AdminEditProductPage({ params }: EditProductPagePr
   let categories: any[] = [];
 
   try {
-    const [allProducts, cats] = await Promise.all([
-      api.getProducts(),
-      api.getCategories(),
+    const [prodRes, catsRes] = await Promise.all([
+      api.getAdminProduct(id),
+      api.getAdminCategories(),
     ]);
-    product = (allProducts ?? []).find((p) => String(p.id) === id || p.slug === id) ?? null;
-    categories = cats ?? [];
+    product = prodRes?.data ?? null;
+    categories = catsRes?.data ?? [];
   } catch {
     product = null;
     categories = [];

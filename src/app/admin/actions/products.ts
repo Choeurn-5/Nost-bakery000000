@@ -2,9 +2,8 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { getAuthenticatedUser, logActivity } from "@/lib/auth-check";
-import slugify from "slugify";
 import { ProductBadge, Availability, ChannelTag, ContentStatus } from "@prisma/client";
 
 const productImageSchema = z.object({
@@ -21,7 +20,8 @@ const productSchema = z.object({
   descriptionEn: z.string().default(""),
   descriptionKm: z.string().default(""),
   price: z.number().nullable().optional(),
-  categoryId: z.string().min(1, "Please select a category"),
+  compareAtPrice: z.number().nullable().optional(),
+  categoryId: z.union([z.string(), z.number()]).transform(String),
   badges: z.array(z.nativeEnum(ProductBadge)).default([]),
   availability: z.nativeEnum(Availability).default(Availability.AVAILABLE),
   channelTags: z.array(z.nativeEnum(ChannelTag)).default([ChannelTag.RETAIL]),
@@ -30,120 +30,83 @@ const productSchema = z.object({
   images: z.array(productImageSchema).default([]),
 });
 
-export async function createProduct(input: z.infer<typeof productSchema>) {
+export async function createProduct(input: z.input<typeof productSchema>) {
   try {
     const user = await getAuthenticatedUser();
     const validated = productSchema.parse(input);
 
-    const baseSlug = validated.slug && validated.slug.trim()
-      ? slugify(validated.slug, { lower: true, strict: true })
-      : slugify(validated.nameEn, { lower: true, strict: true });
-
-    const existingSlug = await prisma.product.findUnique({ where: { slug: baseSlug } });
-    const slug = existingSlug ? `${baseSlug}-${Date.now()}` : baseSlug;
-
-    const count = await prisma.product.count({ where: { categoryId: validated.categoryId } });
-
-    const product = await prisma.product.create({
-      data: {
-        nameEn: validated.nameEn,
-        nameKm: validated.nameKm,
-        slug,
-        descriptionEn: validated.descriptionEn,
-        descriptionKm: validated.descriptionKm,
-        price: validated.price ?? null,
-        categoryId: validated.categoryId,
-        badges: validated.badges,
-        availability: validated.availability,
-        channelTags: validated.channelTags,
-        isFeatured: validated.isFeatured,
-        sortOrder: count,
-        status: validated.status,
-        publishedAt: validated.status === ContentStatus.PUBLISHED ? new Date() : null,
-        images: {
-          create: validated.images.map((img, idx) => ({
-            url: img.url,
-            altEn: img.altEn || validated.nameEn,
-            altKm: img.altKm || validated.nameKm,
-            sortOrder: idx,
-          })),
-        },
-      },
-      include: { images: true, category: true },
+    const res = await api.createProduct({
+      nameEn: validated.nameEn,
+      nameKm: validated.nameKm,
+      slug: validated.slug || undefined,
+      descriptionEn: validated.descriptionEn,
+      descriptionKm: validated.descriptionKm,
+      price: validated.price,
+      compareAtPrice: validated.compareAtPrice,
+      categoryId: validated.categoryId,
+      badges: validated.badges,
+      availability: validated.availability,
+      channelTags: validated.channelTags,
+      isFeatured: validated.isFeatured,
+      status: validated.status,
+      images: validated.images,
     });
+
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to create product" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "created product",
       entity: "Product",
-      entityId: product.id,
-      details: `Created product "${product.nameEn}" (${product.slug}) in "${product.category.nameEn}"`,
+      entityId: res.data?.id ? String(res.data.id) : null,
+      details: `Created product "${validated.nameEn}"`,
     });
 
     revalidatePath("/admin/products");
     revalidatePath("/admin");
     revalidatePath("/", "layout");
 
-    return { success: true, data: product };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to create product";
     return { success: false, error: msg };
   }
 }
 
-export async function updateProduct(id: string, input: z.infer<typeof productSchema>) {
+export async function updateProduct(id: string | number, input: z.input<typeof productSchema>) {
   try {
     const user = await getAuthenticatedUser();
     const validated = productSchema.parse(input);
 
-    const baseSlug = validated.slug && validated.slug.trim()
-      ? slugify(validated.slug, { lower: true, strict: true })
-      : slugify(validated.nameEn, { lower: true, strict: true });
-
-    // Check slug collision
-    const existingSlug = await prisma.product.findFirst({
-      where: { slug: baseSlug, NOT: { id } },
+    const res = await api.updateProduct(id, {
+      nameEn: validated.nameEn,
+      nameKm: validated.nameKm,
+      slug: validated.slug || undefined,
+      descriptionEn: validated.descriptionEn,
+      descriptionKm: validated.descriptionKm,
+      price: validated.price,
+      compareAtPrice: validated.compareAtPrice,
+      categoryId: validated.categoryId,
+      badges: validated.badges,
+      availability: validated.availability,
+      channelTags: validated.channelTags,
+      isFeatured: validated.isFeatured,
+      status: validated.status,
+      images: validated.images,
     });
-    const slug = existingSlug ? `${baseSlug}-${Date.now()}` : baseSlug;
 
-    // Delete old images and recreate with clean order
-    await prisma.productImage.deleteMany({ where: { productId: id } });
-
-    const product = await prisma.product.update({
-      where: { id },
-      data: {
-        nameEn: validated.nameEn,
-        nameKm: validated.nameKm,
-        slug,
-        descriptionEn: validated.descriptionEn,
-        descriptionKm: validated.descriptionKm,
-        price: validated.price ?? null,
-        categoryId: validated.categoryId,
-        badges: validated.badges,
-        availability: validated.availability,
-        channelTags: validated.channelTags,
-        isFeatured: validated.isFeatured,
-        status: validated.status,
-        publishedAt:
-          validated.status === ContentStatus.PUBLISHED ? new Date() : undefined,
-        images: {
-          create: validated.images.map((img, idx) => ({
-            url: img.url,
-            altEn: img.altEn || validated.nameEn,
-            altKm: img.altKm || validated.nameKm,
-            sortOrder: idx,
-          })),
-        },
-      },
-      include: { images: true, category: true },
-    });
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update product" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "updated product",
       entity: "Product",
-      entityId: product.id,
-      details: `Updated product "${product.nameEn}"`,
+      entityId: String(id),
+      details: `Updated product "${validated.nameEn}"`,
     });
 
     revalidatePath("/admin/products");
@@ -151,48 +114,29 @@ export async function updateProduct(id: string, input: z.infer<typeof productSch
     revalidatePath("/admin");
     revalidatePath("/", "layout");
 
-    return { success: true, data: product };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update product";
     return { success: false, error: msg };
   }
 }
 
-export async function deleteProduct(id: string, hardDelete = false) {
+export async function deleteProduct(id: string | number, hardDelete = false) {
   try {
     const user = await getAuthenticatedUser();
 
-    const existing = await prisma.product.findUnique({ where: { id } });
-    if (!existing) {
-      return { success: false, error: "Product not found" };
+    const res = await api.deleteProduct(id, hardDelete);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to delete product" };
     }
 
-    if (hardDelete || existing.status === ContentStatus.TRASHED) {
-      await prisma.productImage.deleteMany({ where: { productId: id } });
-      await prisma.promotionProduct.deleteMany({ where: { productId: id } });
-      await prisma.product.delete({ where: { id } });
-
-      await logActivity({
-        userId: user.id,
-        action: "permanently deleted product",
-        entity: "Product",
-        entityId: id,
-        details: `Deleted product "${existing.nameEn}"`,
-      });
-    } else {
-      await prisma.product.update({
-        where: { id },
-        data: { status: ContentStatus.TRASHED },
-      });
-
-      await logActivity({
-        userId: user.id,
-        action: "trashed product",
-        entity: "Product",
-        entityId: id,
-        details: `Moved product "${existing.nameEn}" to trash`,
-      });
-    }
+    await logActivity({
+      userId: user.id,
+      action: hardDelete ? "permanently deleted product" : "trashed product",
+      entity: "Product",
+      entityId: String(id),
+      details: `Deleted product ID ${id}`,
+    });
 
     revalidatePath("/admin/products");
     revalidatePath("/admin");
@@ -205,18 +149,19 @@ export async function deleteProduct(id: string, hardDelete = false) {
   }
 }
 
-export async function reorderProducts(orderedIds: string[]) {
+export async function reorderProducts(orderedIds: Array<string | number>) {
   try {
     const user = await getAuthenticatedUser();
 
-    await prisma.$transaction(
-      orderedIds.map((id, index) =>
-        prisma.product.update({
-          where: { id },
-          data: { sortOrder: index },
-        })
-      )
-    );
+    const items = orderedIds.map((id, index) => ({
+      id,
+      sortOrder: index,
+    }));
+
+    const res = await api.reorderProducts(items);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to reorder products" };
+    }
 
     await logActivity({
       userId: user.id,
