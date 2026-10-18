@@ -16,6 +16,13 @@ function snakeToCamel(str: string): string {
 
 function transformKeys(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "string") {
+    // If it's a backend storage image URL, ensure it points to the direct /uploads/ path for 100% reliable serving
+    if (obj.includes("manage.nostbakery.com") && obj.includes("/storage/uploads/")) {
+      return obj.replace("/storage/uploads/", "/uploads/");
+    }
+    return obj;
+  }
   if (Array.isArray(obj)) return obj.map(transformKeys);
   if (typeof obj === "object" && obj !== null) {
     const result: Record<string, unknown> = {};

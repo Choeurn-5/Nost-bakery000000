@@ -79,9 +79,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const finalUrl = typeof data.url === "string" ? data.url.replace("/storage/uploads/", "/uploads/") : data.url;
+
     return NextResponse.json({
       success: true,
-      url: data.url,
+      url: finalUrl,
       filename: data.filename,
       size: data.size,
       width: data.width,
