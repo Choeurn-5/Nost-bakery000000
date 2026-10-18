@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { getAuthenticatedUser, logActivity } from "@/lib/auth-check";
 
 const locationSchema = z.object({
@@ -27,21 +27,19 @@ export async function createLocation(input: z.infer<typeof locationSchema>) {
     const user = await getAuthenticatedUser();
     const validated = locationSchema.parse(input);
 
-    const count = await prisma.location.count();
+    const res = await api.saveLocation(validated);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to create location" };
+    }
 
-    const location = await prisma.location.create({
-      data: {
-        ...validated,
-        sortOrder: validated.sortOrder || count,
-      },
-    });
+    const location = res.data;
 
     await logActivity({
       userId: user.id,
       action: "created location",
       entity: "Location",
-      entityId: location.id,
-      details: `Created branch "${location.nameEn}"`,
+      entityId: String(location?.id || ""),
+      details: `Created branch "${validated.nameEn}"`,
     });
 
     revalidatePath("/admin/locations");
@@ -59,17 +57,19 @@ export async function updateLocation(id: string, input: z.infer<typeof locationS
     const user = await getAuthenticatedUser();
     const validated = locationSchema.parse(input);
 
-    const location = await prisma.location.update({
-      where: { id },
-      data: validated,
-    });
+    const res = await api.saveLocation(validated, id);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update location" };
+    }
+
+    const location = res.data;
 
     await logActivity({
       userId: user.id,
       action: "updated location",
       entity: "Location",
-      entityId: location.id,
-      details: `Updated branch "${location.nameEn}"`,
+      entityId: String(id),
+      details: `Updated branch "${validated.nameEn}"`,
     });
 
     revalidatePath("/admin/locations");
@@ -85,14 +85,17 @@ export async function updateLocation(id: string, input: z.infer<typeof locationS
 export async function deleteLocation(id: string) {
   try {
     const user = await getAuthenticatedUser();
-    const location = await prisma.location.delete({ where: { id } });
+    const res = await api.deleteLocation(id);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to delete location" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "deleted location",
       entity: "Location",
       entityId: id,
-      details: `Deleted branch "${location.nameEn}"`,
+      details: `Deleted branch ID "${id}"`,
     });
 
     revalidatePath("/admin/locations");
@@ -109,14 +112,12 @@ export async function reorderLocations(orderedIds: string[]) {
   try {
     const user = await getAuthenticatedUser();
 
-    await prisma.$transaction(
-      orderedIds.map((id, index) =>
-        prisma.location.update({
-          where: { id },
-          data: { sortOrder: index },
-        })
-      )
+    const res = await api.reorderLocations(
+      orderedIds.map((id, index) => ({ id, sortOrder: index }))
     );
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to reorder locations" };
+    }
 
     await logActivity({
       userId: user.id,

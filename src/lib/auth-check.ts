@@ -81,16 +81,15 @@ export async function logActivity({
   details?: string | null;
 }) {
   try {
-    await prisma.activityLog.create({
-      data: {
-        userId,
-        action,
-        entity,
-        entityId: entityId ?? null,
-        details: details ?? null,
-      },
+    const { adminApi } = await import("@/lib/api");
+    await adminApi.logActivity({
+      userId,
+      action,
+      entity,
+      entityId: entityId ?? null,
+      details: details ?? null,
     });
   } catch (error) {
-    console.error("Failed to write to ActivityLog:", error);
+    // Non-blocking log recording
   }
 }

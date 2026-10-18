@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { getAuthenticatedUser, logActivity } from "@/lib/auth-check";
 
 const pageSeoSchema = z.object({
@@ -19,30 +19,18 @@ export async function updatePageSeo(input: z.infer<typeof pageSeoSchema>) {
     const user = await getAuthenticatedUser();
     const validated = pageSeoSchema.parse(input);
 
-    const seo = await prisma.pageSeo.upsert({
-      where: { pageSlug: validated.pageSlug },
-      update: {
-        titleEn: validated.titleEn,
-        titleKm: validated.titleKm,
-        descriptionEn: validated.descriptionEn,
-        descriptionKm: validated.descriptionKm,
-        ogImage: validated.ogImage || null,
-      },
-      create: {
-        pageSlug: validated.pageSlug,
-        titleEn: validated.titleEn,
-        titleKm: validated.titleKm,
-        descriptionEn: validated.descriptionEn,
-        descriptionKm: validated.descriptionKm,
-        ogImage: validated.ogImage || null,
-      },
-    });
+    const res = await api.savePageSeo(validated);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update page SEO" };
+    }
+
+    const seo = res.data;
 
     await logActivity({
       userId: user.id,
       action: "updated page seo",
       entity: "PageSeo",
-      entityId: seo.id,
+      entityId: String(seo?.id || ""),
       details: `Updated SEO meta for page "${validated.pageSlug}"`,
     });
 

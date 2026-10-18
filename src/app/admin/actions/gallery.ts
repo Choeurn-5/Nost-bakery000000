@@ -2,12 +2,11 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { getAuthenticatedUser, logActivity } from "@/lib/auth-check";
-import { GalleryType } from "@prisma/client";
 
 const gallerySchema = z.object({
-  type: z.nativeEnum(GalleryType).default(GalleryType.IMAGE),
+  type: z.enum(["IMAGE", "VIDEO"]).default("IMAGE"),
   url: z.string().min(1, "URL is required"),
   captionEn: z.string().default(""),
   captionKm: z.string().default(""),
@@ -22,21 +21,19 @@ export async function createGalleryItem(input: z.infer<typeof gallerySchema>) {
     const user = await getAuthenticatedUser();
     const validated = gallerySchema.parse(input);
 
-    const count = await prisma.galleryItem.count();
+    const res = await api.saveGalleryItem(validated);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to create gallery item" };
+    }
 
-    const item = await prisma.galleryItem.create({
-      data: {
-        ...validated,
-        sortOrder: validated.sortOrder || count,
-      },
-    });
+    const item = res.data;
 
     await logActivity({
       userId: user.id,
       action: "created gallery item",
       entity: "GalleryItem",
-      entityId: item.id,
-      details: `Added ${item.type.toLowerCase()} to gallery`,
+      entityId: String(item?.id || ""),
+      details: `Added ${validated.type.toLowerCase()} to gallery`,
     });
 
     revalidatePath("/admin/gallery");
@@ -54,17 +51,19 @@ export async function updateGalleryItem(id: string, input: z.infer<typeof galler
     const user = await getAuthenticatedUser();
     const validated = gallerySchema.parse(input);
 
-    const item = await prisma.galleryItem.update({
-      where: { id },
-      data: validated,
-    });
+    const res = await api.saveGalleryItem(validated, id);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update gallery item" };
+    }
+
+    const item = res.data;
 
     await logActivity({
       userId: user.id,
       action: "updated gallery item",
       entity: "GalleryItem",
-      entityId: item.id,
-      details: `Updated ${item.type.toLowerCase()} in gallery`,
+      entityId: String(id),
+      details: `Updated ${validated.type.toLowerCase()} in gallery`,
     });
 
     revalidatePath("/admin/gallery");
@@ -80,14 +79,17 @@ export async function updateGalleryItem(id: string, input: z.infer<typeof galler
 export async function deleteGalleryItem(id: string) {
   try {
     const user = await getAuthenticatedUser();
-    const item = await prisma.galleryItem.delete({ where: { id } });
+    const res = await api.deleteGalleryItem(id);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to delete gallery item" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "deleted gallery item",
       entity: "GalleryItem",
       entityId: id,
-      details: `Deleted ${item.type.toLowerCase()} from gallery`,
+      details: `Deleted gallery item ID "${id}"`,
     });
 
     revalidatePath("/admin/gallery");
@@ -104,14 +106,12 @@ export async function reorderGalleryItems(orderedIds: string[]) {
   try {
     const user = await getAuthenticatedUser();
 
-    await prisma.$transaction(
-      orderedIds.map((id, index) =>
-        prisma.galleryItem.update({
-          where: { id },
-          data: { sortOrder: index },
-        })
-      )
+    const res = await api.reorderGallery(
+      orderedIds.map((id, index) => ({ id, sortOrder: index }))
     );
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to reorder gallery" };
+    }
 
     await logActivity({
       userId: user.id,

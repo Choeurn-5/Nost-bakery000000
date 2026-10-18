@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { getAuthenticatedUser, logActivity } from "@/lib/auth-check";
 
 const wholesaleSettingsSchema = z.object({
@@ -22,27 +22,23 @@ export async function updateWholesaleSettings(input: z.infer<typeof wholesaleSet
     const user = await getAuthenticatedUser();
     const validated = wholesaleSettingsSchema.parse(input);
 
-    const updated = await prisma.wholesaleSettings.upsert({
-      where: { id: "default" },
-      update: validated,
-      create: {
-        id: "default",
-        ...validated,
-      },
-    });
+    const res = await api.saveWholesaleSettings(validated);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update wholesale settings" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "updated wholesale settings",
       entity: "WholesaleSettings",
-      entityId: "default",
+      entityId: "wholesale-settings",
       details: "Updated wholesale hero content and delivery terms",
     });
 
     revalidatePath("/admin/wholesale");
     revalidatePath("/", "layout");
 
-    return { success: true, data: updated };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update wholesale settings";
     return { success: false, error: msg };
@@ -65,21 +61,19 @@ export async function createWholesaleStep(input: z.infer<typeof stepSchema>) {
     const user = await getAuthenticatedUser();
     const validated = stepSchema.parse(input);
 
-    const count = await prisma.wholesaleStep.count();
+    const res = await api.saveWholesaleStep(validated);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to create wholesale step" };
+    }
 
-    const step = await prisma.wholesaleStep.create({
-      data: {
-        ...validated,
-        sortOrder: validated.sortOrder || count,
-      },
-    });
+    const step = res.data;
 
     await logActivity({
       userId: user.id,
       action: "created wholesale step",
       entity: "WholesaleStep",
-      entityId: step.id,
-      details: `Created step "${step.titleEn}"`,
+      entityId: String(step?.id || ""),
+      details: `Created step "${validated.titleEn}"`,
     });
 
     revalidatePath("/admin/wholesale");
@@ -95,17 +89,19 @@ export async function updateWholesaleStep(id: string, input: z.infer<typeof step
     const user = await getAuthenticatedUser();
     const validated = stepSchema.parse(input);
 
-    const step = await prisma.wholesaleStep.update({
-      where: { id },
-      data: validated,
-    });
+    const res = await api.saveWholesaleStep(validated, id);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update wholesale step" };
+    }
+
+    const step = res.data;
 
     await logActivity({
       userId: user.id,
       action: "updated wholesale step",
       entity: "WholesaleStep",
-      entityId: step.id,
-      details: `Updated step "${step.titleEn}"`,
+      entityId: String(id),
+      details: `Updated step "${validated.titleEn}"`,
     });
 
     revalidatePath("/admin/wholesale");
@@ -119,14 +115,17 @@ export async function updateWholesaleStep(id: string, input: z.infer<typeof step
 export async function deleteWholesaleStep(id: string) {
   try {
     const user = await getAuthenticatedUser();
-    const step = await prisma.wholesaleStep.delete({ where: { id } });
+    const res = await api.deleteWholesaleStep(id);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to delete wholesale step" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "deleted wholesale step",
       entity: "WholesaleStep",
       entityId: id,
-      details: `Deleted step "${step.titleEn}"`,
+      details: `Deleted wholesale step ID "${id}"`,
     });
 
     revalidatePath("/admin/wholesale");
@@ -141,14 +140,12 @@ export async function reorderWholesaleSteps(orderedIds: string[]) {
   try {
     const user = await getAuthenticatedUser();
 
-    await prisma.$transaction(
-      orderedIds.map((id, index) =>
-        prisma.wholesaleStep.update({
-          where: { id },
-          data: { sortOrder: index },
-        })
-      )
+    const res = await api.reorderWholesaleSteps(
+      orderedIds.map((id, index) => ({ id, sortOrder: index }))
     );
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to reorder steps" };
+    }
 
     await logActivity({
       userId: user.id,
@@ -182,21 +179,19 @@ export async function createFaqItem(input: z.infer<typeof faqSchema>) {
     const user = await getAuthenticatedUser();
     const validated = faqSchema.parse(input);
 
-    const count = await prisma.faqItem.count({ where: { section: validated.section } });
+    const res = await api.saveFaq(validated);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to create FAQ item" };
+    }
 
-    const faq = await prisma.faqItem.create({
-      data: {
-        ...validated,
-        sortOrder: validated.sortOrder || count,
-      },
-    });
+    const faq = res.data;
 
     await logActivity({
       userId: user.id,
       action: "created faq item",
       entity: "FaqItem",
-      entityId: faq.id,
-      details: `Created FAQ "${faq.questionEn}"`,
+      entityId: String(faq?.id || ""),
+      details: `Created FAQ "${validated.questionEn}"`,
     });
 
     revalidatePath("/admin/wholesale");
@@ -212,17 +207,19 @@ export async function updateFaqItem(id: string, input: z.infer<typeof faqSchema>
     const user = await getAuthenticatedUser();
     const validated = faqSchema.parse(input);
 
-    const faq = await prisma.faqItem.update({
-      where: { id },
-      data: validated,
-    });
+    const res = await api.saveFaq(validated, id);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update FAQ item" };
+    }
+
+    const faq = res.data;
 
     await logActivity({
       userId: user.id,
       action: "updated faq item",
       entity: "FaqItem",
-      entityId: faq.id,
-      details: `Updated FAQ "${faq.questionEn}"`,
+      entityId: String(id),
+      details: `Updated FAQ "${validated.questionEn}"`,
     });
 
     revalidatePath("/admin/wholesale");
@@ -236,14 +233,17 @@ export async function updateFaqItem(id: string, input: z.infer<typeof faqSchema>
 export async function deleteFaqItem(id: string) {
   try {
     const user = await getAuthenticatedUser();
-    const faq = await prisma.faqItem.delete({ where: { id } });
+    const res = await api.deleteFaq(id);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to delete FAQ item" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "deleted faq item",
       entity: "FaqItem",
       entityId: id,
-      details: `Deleted FAQ "${faq.questionEn}"`,
+      details: `Deleted FAQ ID "${id}"`,
     });
 
     revalidatePath("/admin/wholesale");
@@ -258,14 +258,12 @@ export async function reorderFaqItems(orderedIds: string[]) {
   try {
     const user = await getAuthenticatedUser();
 
-    await prisma.$transaction(
-      orderedIds.map((id, index) =>
-        prisma.faqItem.update({
-          where: { id },
-          data: { sortOrder: index },
-        })
-      )
+    const res = await api.reorderFaqs(
+      orderedIds.map((id, index) => ({ id, sortOrder: index }))
     );
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to reorder FAQs" };
+    }
 
     await logActivity({
       userId: user.id,

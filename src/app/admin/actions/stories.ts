@@ -2,9 +2,8 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { getAuthenticatedUser, logActivity } from "@/lib/auth-check";
-import { StoryLayout } from "@prisma/client";
 
 const storySchema = z.object({
   headingEn: z.string().min(1, "English heading is required"),
@@ -14,7 +13,7 @@ const storySchema = z.object({
   image: z.string().nullable().optional(),
   imageAltEn: z.string().default(""),
   imageAltKm: z.string().default(""),
-  layout: z.nativeEnum(StoryLayout).default(StoryLayout.IMAGE_LEFT),
+  layout: z.enum(["IMAGE_LEFT", "IMAGE_RIGHT", "FULL_WIDTH"]).default("IMAGE_LEFT"),
   sortOrder: z.number().int().default(0),
   isVisible: z.boolean().default(true),
 });
@@ -24,21 +23,19 @@ export async function createStoryBlock(input: z.infer<typeof storySchema>) {
     const user = await getAuthenticatedUser();
     const validated = storySchema.parse(input);
 
-    const count = await prisma.storyBlock.count();
+    const res = await api.saveStory(validated);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to create story block" };
+    }
 
-    const block = await prisma.storyBlock.create({
-      data: {
-        ...validated,
-        sortOrder: validated.sortOrder || count,
-      },
-    });
+    const block = res.data;
 
     await logActivity({
       userId: user.id,
       action: "created story block",
       entity: "StoryBlock",
-      entityId: block.id,
-      details: `Created story block "${block.headingEn}"`,
+      entityId: String(block?.id || ""),
+      details: `Created story block "${validated.headingEn}"`,
     });
 
     revalidatePath("/admin/bakery-stories");
@@ -56,17 +53,19 @@ export async function updateStoryBlock(id: string, input: z.infer<typeof storySc
     const user = await getAuthenticatedUser();
     const validated = storySchema.parse(input);
 
-    const block = await prisma.storyBlock.update({
-      where: { id },
-      data: validated,
-    });
+    const res = await api.saveStory(validated, id);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update story block" };
+    }
+
+    const block = res.data;
 
     await logActivity({
       userId: user.id,
       action: "updated story block",
       entity: "StoryBlock",
-      entityId: block.id,
-      details: `Updated story block "${block.headingEn}"`,
+      entityId: String(id),
+      details: `Updated story block "${validated.headingEn}"`,
     });
 
     revalidatePath("/admin/bakery-stories");
@@ -82,14 +81,17 @@ export async function updateStoryBlock(id: string, input: z.infer<typeof storySc
 export async function deleteStoryBlock(id: string) {
   try {
     const user = await getAuthenticatedUser();
-    const block = await prisma.storyBlock.delete({ where: { id } });
+    const res = await api.deleteStory(id);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to delete story block" };
+    }
 
     await logActivity({
       userId: user.id,
       action: "deleted story block",
       entity: "StoryBlock",
       entityId: id,
-      details: `Deleted story block "${block.headingEn}"`,
+      details: `Deleted story block ID "${id}"`,
     });
 
     revalidatePath("/admin/bakery-stories");
@@ -106,14 +108,12 @@ export async function reorderStoryBlocks(orderedIds: string[]) {
   try {
     const user = await getAuthenticatedUser();
 
-    await prisma.$transaction(
-      orderedIds.map((id, index) =>
-        prisma.storyBlock.update({
-          where: { id },
-          data: { sortOrder: index },
-        })
-      )
+    const res = await api.reorderStories(
+      orderedIds.map((id, index) => ({ id, sortOrder: index }))
     );
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to reorder story blocks" };
+    }
 
     await logActivity({
       userId: user.id,

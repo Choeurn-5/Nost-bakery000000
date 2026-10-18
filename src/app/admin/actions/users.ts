@@ -2,16 +2,14 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import { requireOwner, logActivity } from "@/lib/auth-check";
-import { Role } from "@prisma/client";
 
 const createUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Valid email is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.nativeEnum(Role).default(Role.EDITOR),
+  role: z.enum(["OWNER", "EDITOR", "ADMIN"]).default("EDITOR"),
 });
 
 export async function createUser(input: z.infer<typeof createUserSchema>) {
@@ -21,30 +19,25 @@ export async function createUser(input: z.infer<typeof createUserSchema>) {
 
     const email = validated.email.toLowerCase().trim();
 
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return { success: false, error: "A user with this email already exists." };
+    const res = await api.saveAdminUser({
+      name: validated.name,
+      email,
+      password: validated.password,
+      role: validated.role,
+      active: true,
+    });
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to create user" };
     }
 
-    const hashedPassword = await bcrypt.hash(validated.password, 10);
-
-    const newUser = await prisma.user.create({
-      data: {
-        name: validated.name,
-        email,
-        hashedPassword,
-        role: validated.role,
-        active: true,
-      },
-      select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
-    });
+    const newUser = res.data;
 
     await logActivity({
       userId: currentOwner.id,
       action: "created user",
       entity: "User",
-      entityId: newUser.id,
-      details: `Created user "${newUser.name}" (${newUser.email}) with role ${newUser.role}`,
+      entityId: String(newUser?.id || ""),
+      details: `Created user "${validated.name}" (${email}) with role ${validated.role}`,
     });
 
     revalidatePath("/admin/users");
@@ -55,67 +48,90 @@ export async function createUser(input: z.infer<typeof createUserSchema>) {
   }
 }
 
-export async function updateUserRole(userId: string, newRole: Role) {
+export async function updateUserRole(userId: string, newRole: string) {
   try {
     const currentOwner = await requireOwner();
 
-    if (userId === currentOwner.id) {
+    if (String(userId) === String(currentOwner.id)) {
       return { success: false, error: "You cannot change your own role." };
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: { role: newRole },
-      select: { id: true, name: true, email: true, role: true },
-    });
+    const res = await api.saveAdminUser({ role: newRole }, userId);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to update user role" };
+    }
 
     await logActivity({
       userId: currentOwner.id,
       action: "changed user role",
       entity: "User",
-      entityId: userId,
-      details: `Changed role for "${updatedUser.name}" to ${newRole}`,
+      entityId: String(userId),
+      details: `Changed role for user ID "${userId}" to ${newRole}`,
     });
 
     revalidatePath("/admin/users");
-    return { success: true, data: updatedUser };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update user role";
     return { success: false, error: msg };
   }
 }
 
-export async function toggleUserActive(userId: string) {
+export async function toggleUserActive(userId: string, currentActiveStatus?: boolean) {
   try {
     const currentOwner = await requireOwner();
 
-    if (userId === currentOwner.id) {
+    if (String(userId) === String(currentOwner.id)) {
       return { success: false, error: "You cannot deactivate your own account." };
     }
 
-    const target = await prisma.user.findUnique({ where: { id: userId } });
-    if (!target) {
-      return { success: false, error: "User not found" };
+    const newActiveState = currentActiveStatus !== undefined ? !currentActiveStatus : false;
+    const res = await api.saveAdminUser({ active: newActiveState }, userId);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to toggle user status" };
     }
-
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: { active: !target.active },
-      select: { id: true, name: true, email: true, active: true },
-    });
 
     await logActivity({
       userId: currentOwner.id,
-      action: updated.active ? "activated user" : "deactivated user",
+      action: newActiveState ? "activated user" : "deactivated user",
       entity: "User",
-      entityId: userId,
-      details: `${updated.active ? "Activated" : "Deactivated"} account for "${updated.name}"`,
+      entityId: String(userId),
+      details: `${newActiveState ? "Activated" : "Deactivated"} account for user ID "${userId}"`,
     });
 
     revalidatePath("/admin/users");
-    return { success: true, data: updated };
+    return { success: true, data: res.data };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to toggle user status";
+    return { success: false, error: msg };
+  }
+}
+
+export async function deleteUser(userId: string) {
+  try {
+    const currentOwner = await requireOwner();
+
+    if (String(userId) === String(currentOwner.id)) {
+      return { success: false, error: "You cannot delete your own account." };
+    }
+
+    const res = await api.deleteAdminUser(userId);
+    if (!res.success) {
+      return { success: false, error: res.error || "Failed to delete user" };
+    }
+
+    await logActivity({
+      userId: currentOwner.id,
+      action: "deleted user",
+      entity: "User",
+      entityId: String(userId),
+      details: `Deleted user ID "${userId}"`,
+    });
+
+    revalidatePath("/admin/users");
+    return { success: true };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Failed to delete user";
     return { success: false, error: msg };
   }
 }

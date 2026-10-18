@@ -597,4 +597,151 @@ export const api = {
 
   deleteInboxItem: (id: string | number) =>
     adminFetch(`/inbox/${id}`, { method: "DELETE" }),
+
+  // Locations
+  getAdminLocations: () =>
+    adminFetch<any[]>("/locations"),
+
+  saveLocation: (data: Record<string, unknown>, id?: string | number) =>
+    adminFetch<any>(id ? `/locations/${id}` : "/locations", {
+      method: id ? "PUT" : "POST",
+      body: data,
+    }),
+
+  deleteLocation: (id: string | number) =>
+    adminFetch(`/locations/${id}`, { method: "DELETE" }),
+
+  reorderLocations: (items: Array<{ id: string | number; sortOrder: number }>) =>
+    adminFetch("/locations/reorder", { method: "POST", body: { items } }),
+
+  // Stories
+  getAdminStories: () =>
+    adminFetch<any[]>("/stories"),
+
+  saveStory: (data: Record<string, unknown>, id?: string | number) =>
+    adminFetch<any>(id ? `/stories/${id}` : "/stories", {
+      method: id ? "PUT" : "POST",
+      body: data,
+    }),
+
+  deleteStory: (id: string | number) =>
+    adminFetch(`/stories/${id}`, { method: "DELETE" }),
+
+  reorderStories: (items: Array<{ id: string | number; sortOrder: number }>) =>
+    adminFetch("/stories/reorder", { method: "POST", body: { items } }),
+
+  // Testimonials
+  getAdminTestimonials: () =>
+    adminFetch<any[]>("/testimonials"),
+
+  saveTestimonial: (data: Record<string, unknown>, id?: string | number) =>
+    adminFetch<any>(id ? `/testimonials/${id}` : "/testimonials", {
+      method: id ? "PUT" : "POST",
+      body: data,
+    }),
+
+  deleteTestimonial: (id: string | number) =>
+    adminFetch(`/testimonials/${id}`, { method: "DELETE" }),
+
+  reorderTestimonials: (items: Array<{ id: string | number; sortOrder: number }>) =>
+    adminFetch("/testimonials/reorder", { method: "POST", body: { items } }),
+
+  // Gallery
+  getAdminGallery: () =>
+    adminFetch<any[]>("/gallery"),
+
+  saveGalleryItem: (data: Record<string, unknown>, id?: string | number) =>
+    adminFetch<any>(id ? `/gallery/${id}` : "/gallery", {
+      method: id ? "PUT" : "POST",
+      body: data,
+    }),
+
+  deleteGalleryItem: (id: string | number) =>
+    adminFetch(`/gallery/${id}`, { method: "DELETE" }),
+
+  reorderGallery: (items: Array<{ id: string | number; sortOrder: number }>) =>
+    adminFetch("/gallery/reorder", { method: "POST", body: { items } }),
+
+  // Wholesale
+  getAdminWholesale: () =>
+    adminFetch<{ settings: any; steps: any[] }>("/wholesale"),
+
+  saveWholesaleSettings: (data: Record<string, unknown>) =>
+    adminFetch<any>("/wholesale", { method: "POST", body: data }),
+
+  saveWholesaleStep: (data: Record<string, unknown>, id?: string | number) =>
+    adminFetch<any>(id ? `/wholesale/steps/${id}` : "/wholesale/steps", {
+      method: id ? "PUT" : "POST",
+      body: data,
+    }),
+
+  deleteWholesaleStep: (id: string | number) =>
+    adminFetch(`/wholesale/steps/${id}`, { method: "DELETE" }),
+
+  reorderWholesaleSteps: (items: Array<{ id: string | number; sortOrder: number }>) =>
+    adminFetch("/wholesale/steps/reorder", { method: "POST", body: { items } }),
+
+  // FAQs
+  getAdminFaqs: (section?: string) =>
+    adminFetch<any[]>(`/faqs${section ? `?section=${section}` : ""}`),
+
+  saveFaq: (data: Record<string, unknown>, id?: string | number) =>
+    adminFetch<any>(id ? `/faqs/${id}` : "/faqs", {
+      method: id ? "PUT" : "POST",
+      body: data,
+    }),
+
+  deleteFaq: (id: string | number) =>
+    adminFetch(`/faqs/${id}`, { method: "DELETE" }),
+
+  reorderFaqs: (items: Array<{ id: string | number; sortOrder: number }>) =>
+    adminFetch("/faqs/reorder", { method: "POST", body: { items } }),
+
+  // Pages & SEO
+  getAdminPagesSeo: () =>
+    adminFetch<any[]>("/pages-seo"),
+
+  savePageSeo: (data: Record<string, unknown>) =>
+    adminFetch<any>("/pages-seo", { method: "POST", body: data }),
+
+  // Users
+  getAdminUsers: () =>
+    adminFetch<any[]>("/users"),
+
+  saveAdminUser: (data: Record<string, unknown>, id?: string | number) =>
+    adminFetch<any>(id ? `/users/${id}` : "/users", {
+      method: id ? "PUT" : "POST",
+      body: data,
+    }),
+
+  deleteAdminUser: (id: string | number) =>
+    adminFetch(`/users/${id}`, { method: "DELETE" }),
+
+  // Media Library
+  getAdminMedia: () =>
+    adminFetch<any[]>("/media"),
+
+  saveMedia: (data: Record<string, unknown>) =>
+    adminFetch<any>("/media", { method: "POST", body: data }),
+
+  deleteMedia: (id: string | number) =>
+    adminFetch(`/media/${id}`, { method: "DELETE" }),
+
+  // Activity Log
+  getAdminActivityLogs: () =>
+    adminFetch<any[]>("/activity-log"),
+
+  logActivity: (data: {
+    userId?: string;
+    userEmail?: string;
+    userName?: string;
+    action: string;
+    entity: string;
+    entityId?: string | null;
+    details?: string | null;
+  }) =>
+    adminFetch<any>("/activity-log", { method: "POST", body: data }),
 };
+
+export const adminApi = api;
+
