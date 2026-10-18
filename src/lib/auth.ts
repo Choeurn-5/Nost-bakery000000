@@ -47,25 +47,57 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = String(credentials.email).toLowerCase().trim();
         const password = String(credentials.password);
 
-        const user = await prisma.user.findUnique({
-          where: { email },
-        });
+        // 1. Authenticate via backend API (Laravel Sanctum)
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+        try {
+          const apiRes = await fetch(`${apiBase}/api/auth/login`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({ email, password }),
+          });
 
-        if (!user || !user.active) {
-          return null;
+          if (apiRes.ok) {
+            const json = await apiRes.json();
+            if (json.success && json.data?.user) {
+              return {
+                id: String(json.data.user.id),
+                email: json.data.user.email,
+                name: json.data.user.name,
+                role: json.data.user.role as Role,
+              };
+            }
+          }
+        } catch {
+          // Backend API unreachable, fall back to local prisma
         }
 
-        const isValid = await bcrypt.compare(password, user.hashedPassword);
-        if (!isValid) {
+        // 2. Fallback to direct database check
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email },
+          });
+
+          if (!user || !user.active) {
+            return null;
+          }
+
+          const isValid = await bcrypt.compare(password, user.hashedPassword);
+          if (!isValid) {
+            return null;
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+          };
+        } catch {
           return null;
         }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        };
       },
     }),
   ],

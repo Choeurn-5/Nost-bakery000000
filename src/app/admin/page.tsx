@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { api } from "@/lib/api";
 import {
   Inbox,
   ShoppingBag,
@@ -17,22 +18,48 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  const [
-    newEnquiriesCount,
-    publishedProductsCount,
-    activePromotionsCount,
-    categoriesCount,
-    recentSubmissions,
-  ] = await Promise.all([
-    prisma.formSubmission.count({ where: { status: "NEW" } }),
-    prisma.product.count({ where: { status: "PUBLISHED" } }),
-    prisma.promotion.count({ where: { status: "PUBLISHED" } }),
-    prisma.category.count(),
-    prisma.formSubmission.findMany({
-      take: 5,
-      orderBy: { createdAt: "desc" },
-    }),
-  ]);
+  let newEnquiriesCount = 0;
+  let publishedProductsCount = 0;
+  let activePromotionsCount = 0;
+  let categoriesCount = 0;
+  let recentSubmissions: any[] = [];
+
+  try {
+    const [
+      enquiries,
+      products,
+      promos,
+      cats,
+      submissions,
+    ] = await Promise.all([
+      prisma.formSubmission.count({ where: { status: "NEW" } }),
+      prisma.product.count({ where: { status: "PUBLISHED" } }),
+      prisma.promotion.count({ where: { status: "PUBLISHED" } }),
+      prisma.category.count(),
+      prisma.formSubmission.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+    newEnquiriesCount = enquiries;
+    publishedProductsCount = products;
+    activePromotionsCount = promos;
+    categoriesCount = cats;
+    recentSubmissions = submissions;
+  } catch {
+    try {
+      const [prods, cats, promos] = await Promise.all([
+        api.getProducts(),
+        api.getCategories(),
+        api.getPromotions(),
+      ]);
+      publishedProductsCount = prods?.length ?? 0;
+      categoriesCount = cats?.length ?? 0;
+      activePromotionsCount = promos?.length ?? 0;
+    } catch {
+      // offline fallback
+    }
+  }
 
   const statCards = [
     {
