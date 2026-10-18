@@ -5,7 +5,8 @@
  * and transforms snake_case responses to camelCase for React components.
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://manage.nostbakery.com";
+const rawBase = (process.env.NEXT_PUBLIC_API_URL || "https://manage.nostbakery.com/laravel/public").replace(/\/+$/, "");
+const API_BASE = rawBase.endsWith("/api") ? rawBase.slice(0, -4) : rawBase;
 
 // ─── snake_case → camelCase transformer ───
 

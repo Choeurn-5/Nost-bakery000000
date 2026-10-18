@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+    const rawApiUrl = (process.env.NEXT_PUBLIC_API_URL || "https://manage.nostbakery.com/laravel/public").replace(/\/+$/, "");
+    const apiUrl = rawApiUrl.endsWith("/api") ? rawApiUrl.slice(0, -4) : rawApiUrl;
     const adminSecret = process.env.ADMIN_API_SECRET || "nost-bakery-internal-admin-secret-2025";
 
     // Prepare outbound multipart form data for Laravel backend

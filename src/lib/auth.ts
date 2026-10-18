@@ -25,6 +25,8 @@ declare module "@auth/core/jwt" {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "nost-bakery-jwt-super-secret-key-32charsmin!",
+  trustHost: true,
   session: {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
@@ -48,7 +50,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = String(credentials.password);
 
         // 1. Authenticate via backend API (Laravel Sanctum)
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+        const rawApiBase = (process.env.NEXT_PUBLIC_API_URL || "https://manage.nostbakery.com/laravel/public").replace(/\/+$/, "");
+        const apiBase = rawApiBase.endsWith("/api") ? rawApiBase.slice(0, -4) : rawApiBase;
         try {
           const apiRes = await fetch(`${apiBase}/api/auth/login`, {
             method: "POST",
