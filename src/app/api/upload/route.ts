@@ -21,24 +21,60 @@ export async function POST(req: NextRequest) {
     const outboundFormData = new FormData();
     outboundFormData.append("file", file);
 
-    const backendRes = await fetch(`${apiUrl}/api/admin/upload`, {
-      method: "POST",
-      headers: {
-        "X-Admin-Secret": adminSecret,
-        Accept: "application/json",
-      },
-      body: outboundFormData,
-    });
+    let data: any = null;
+    let backendRes: Response | null = null;
 
-    const data = await backendRes.json();
+    try {
+      // 1. Attempt standard multipart upload first
+      backendRes = await fetch(`${apiUrl}/api/admin/upload`, {
+        method: "POST",
+        headers: {
+          "X-Admin-Secret": adminSecret,
+          Accept: "application/json",
+        },
+        body: outboundFormData,
+      });
 
-    if (!backendRes.ok || !data.success) {
+      if (backendRes.ok) {
+        data = await backendRes.json();
+      }
+    } catch {
+      // Fallback below
+    }
+
+    // 2. If multipart was rejected by server firewall (e.g. 403 or non-200), fall back to base64 JSON payload
+    if (!data || !data.success) {
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      const mime = file.type || "image/jpeg";
+      const base64Data = `data:${mime};base64,${buffer.toString("base64")}`;
+
+      backendRes = await fetch(`${apiUrl}/api/admin/upload`, {
+        method: "POST",
+        headers: {
+          "X-Admin-Secret": adminSecret,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          image_base64: base64Data,
+        }),
+      });
+
+      try {
+        data = await backendRes.json();
+      } catch {
+        data = null;
+      }
+    }
+
+    if (!data || !data.success) {
       return NextResponse.json(
         {
           success: false,
-          error: data.message || data.error || "Failed to upload image to backend storage.",
+          error: data?.message || data?.error || "Failed to upload image to backend storage.",
         },
-        { status: backendRes.status || 500 }
+        { status: backendRes?.status || 500 }
       );
     }
 
